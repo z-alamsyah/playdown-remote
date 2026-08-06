@@ -16,33 +16,60 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
   header {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 10px; border-bottom: 1px solid #30363d; flex-shrink: 0;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-bottom: 1px solid #30363d; flex-shrink: 0;
   }
-  .brand { font-weight: 800; font-size: 13px; flex-shrink: 0; letter-spacing: .02em; }
+  .brand { font-weight: 800; font-size: 15px; letter-spacing: .02em; }
   .conn { width: 8px; height: 8px; border-radius: 50%; background: #f85149; flex-shrink: 0; }
   .conn.up { background: #3fb950; }
-  .tabs { display: flex; gap: 6px; }
-  .tab {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; border-radius: 7px; font-size: 13px; font-weight: 600;
-    background: #21262d; color: #8d96a0; border: 1px solid transparent;
-    white-space: nowrap; cursor: pointer;
+  .count { margin-left: auto; color: #8d96a0; font-size: 13px; font-weight: 600; }
+  .back {
+    display: none; background: none; border: none; color: #58a6ff;
+    font-size: 24px; line-height: 1; padding: 0 8px 3px 0; cursor: pointer;
   }
-  .tab.on { background: #e8dcc0; color: #1c2733; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #6e7681; background: transparent; }
+  #hdrSession { display: none; align-items: center; gap: 8px; min-width: 0; }
+  #hdrSession .nm {
+    font-weight: 700; font-size: 15px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ---- session list (page 1) ---- */
+  #viewList { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 12px; }
+  .sect { margin-bottom: 20px; }
+  .sect h2 {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11px; font-weight: 700; letter-spacing: .09em;
+    color: #8d96a0; margin: 0 2px 8px;
+  }
+  .row {
+    display: flex; align-items: center; gap: 11px; width: 100%;
+    background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+    padding: 13px 12px; margin-bottom: 8px; color: #e6edf3;
+    font-size: 15px; text-align: left; cursor: pointer;
+    font-family: inherit;
+  }
+  .row:active { background: #21262d; }
+  .row.blocked { border-color: rgba(248, 81, 73, .55); background: rgba(248, 81, 73, .08); }
+  .row .meta { min-width: 0; }
+  .row .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sub { color: #8d96a0; font-size: 12.5px; margin-top: 2px; }
+  .row .chev { margin-left: auto; color: #6e7681; font-size: 20px; flex-shrink: 0; }
+  .empty { color: #6e7681; font-size: 14px; padding: 40px 20px; text-align: center; }
+
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #6e7681; background: transparent; flex-shrink: 0; }
   .dot.blocked { background: #f85149; border-color: #f85149; }
   .dot.done { background: #3fb950; border-color: #3fb950; }
   .spin {
-    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
-    border: 2px solid rgba(88,166,255,.3); border-top-color: #58a6ff;
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid rgba(88, 166, 255, .3); border-top-color: #58a6ff;
     animation: r .9s linear infinite;
   }
   @keyframes r { to { transform: rotate(360deg); } }
+
+  /* ---- terminal (page 2) ---- */
+  #viewTerm { flex: 1; min-height: 0; display: none; flex-direction: column; }
   main { flex: 1; min-height: 0; padding: 6px 4px 8px 8px; }
   #term { height: 100%; }
-  .empty { color: #6e7681; font-size: 14px; padding: 24px; text-align: center; }
   /* Terminal key bar — iOS keyboards have no Esc/arrows, TUIs need them */
   .keybar {
     display: flex; gap: 6px; padding: 6px 8px; flex-shrink: 0;
@@ -60,23 +87,30 @@
 </head>
 <body>
   <header>
+    <button class="back" id="back">‹</button>
     <span class="conn" id="conn"></span>
-    <span class="brand">Playdown</span>
-    <div class="tabs" id="tabs"></div>
+    <span class="brand" id="brand">Playdown</span>
+    <span id="hdrSession"><span id="hdrDot" class="dot"></span><span class="nm" id="hdrName"></span></span>
+    <span class="count" id="count"></span>
   </header>
-  <main><div id="term"></div><div class="empty" id="empty">Connecting…</div></main>
-  <div class="keybar" id="keybar">
-    <button data-seq="&#27;">esc</button>
-    <button data-seq="&#9;">tab</button>
-    <button id="ctrlKey">ctrl</button>
-    <button data-seq="&#27;[A">↑</button>
-    <button data-seq="&#27;[B">↓</button>
-    <button data-seq="&#27;[D">←</button>
-    <button data-seq="&#27;[C">→</button>
-    <button data-seq="&#13;">↵</button>
-    <button data-seq="&#3;">^C</button>
-    <button id="fontMinus">A−</button>
-    <button id="fontPlus">A+</button>
+
+  <div id="viewList"><div class="empty">Connecting…</div></div>
+
+  <div id="viewTerm">
+    <main><div id="term"></div></main>
+    <div class="keybar" id="keybar">
+      <button data-seq="&#27;">esc</button>
+      <button data-seq="&#9;">tab</button>
+      <button id="ctrlKey">ctrl</button>
+      <button data-seq="&#27;[A">↑</button>
+      <button data-seq="&#27;[B">↓</button>
+      <button data-seq="&#27;[D">←</button>
+      <button data-seq="&#27;[C">→</button>
+      <button data-seq="&#13;">↵</button>
+      <button data-seq="&#3;">^C</button>
+      <button id="fontMinus">A−</button>
+      <button id="fontPlus">A+</button>
+    </div>
   </div>
 
 <script src="/assets/xterm.js"></script>
@@ -84,7 +118,7 @@
 <script>
   const VIEW_ONLY = __VIEW_ONLY__;
   const token = (location.hash.match(/t=([0-9a-f]+)/) || [])[1] || "";
-  let ws, sessions = [], current = null, term, fit;
+  let ws, sessions = [], current = null, term, fit, view = "list";
 
   const $ = (id) => document.getElementById(id);
 
@@ -103,19 +137,21 @@
 
   let ctrlArmed = false;
 
-  function sendData(d) {
+  function sendRaw(d) {
     if (VIEW_ONLY || !current || ws?.readyState !== 1) return;
     ws.send(JSON.stringify({ op: "input", id: current, data: strToB64(d) }));
-    // Typing while scrolled up in history: snap back to the live prompt
-    // (input bypasses xterm's own scroll-on-input path).
-    term.scrollToBottom();
+  }
+  function sendData(d) {
+    sendRaw(d);
+    // Typing while scrolled up in history: snap back to the live prompt.
+    term?.scrollToBottom();
   }
 
   // Resize the PTY to this viewport (tmux-style "last client wins") so TUIs
   // reflow to phone width instead of wrapping 200-col desktop output.
   let resizeTimer;
   function sendResize() {
-    if (VIEW_ONLY || !current || ws?.readyState !== 1) return;
+    if (VIEW_ONLY || !current || ws?.readyState !== 1 || !term) return;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       ws.send(JSON.stringify({ op: "resize", id: current, cols: term.cols, rows: term.rows }));
@@ -123,6 +159,7 @@
   }
 
   function refit() {
+    if (!term || view !== "term") return;
     fit.fit();
     sendResize();
   }
@@ -153,6 +190,7 @@
         sendData(d);
       });
     }
+    initTouchScroll();
   }
 
   function setCtrl(v) {
@@ -160,15 +198,40 @@
     $("ctrlKey").classList.toggle("armed", v);
   }
 
+  // Scroll the terminal by N lines. TUIs like Claude Code enable mouse
+  // tracking and keep their history INTERNALLY (they repaint in place, so
+  // xterm's scrollback has nothing to show) — for those, send SGR wheel
+  // reports at the touch position, exactly what a desktop mouse wheel sends.
+  // Plain shells get local scrollback via scrollLines.
+  function scrollTerm(lines, x, y) {
+    if (!lines) return;
+    const mt = term.modes?.mouseTrackingMode;
+    if (mt && mt !== "none" && !VIEW_ONLY) {
+      const el = $("term");
+      const col = Math.max(1, Math.min(term.cols, Math.ceil(x / (el.clientWidth / term.cols))));
+      const row = Math.max(1, Math.min(term.rows, Math.ceil(y / (el.clientHeight / term.rows))));
+      const btn = lines > 0 ? 65 : 64; // 65 = wheel down, 64 = wheel up
+      const n = Math.min(8, Math.abs(lines));
+      for (let i = 0; i < n; i++) sendRaw(`\x1b[<${btn};${col};${row}M`);
+    } else {
+      term.scrollLines(lines);
+    }
+  }
+
   // Touch scrolling — xterm.js has no working touch scroll on iOS (touches
   // land on the screen layer, not the scrollable viewport). Translate drags
-  // into scrollLines, with a light momentum flick.
+  // into scrollTerm, with a light momentum flick.
   function initTouchScroll() {
     const el = $("term");
-    let lastY = null, lastT = 0, acc = 0, velocity = 0, glide = 0;
+    let lastY = null, lastT = 0, lastX = 0, acc = 0, velocity = 0, glide = 0;
     const cell = () => el.clientHeight / term.rows;
+    const rel = (t) => {
+      const r = el.getBoundingClientRect();
+      return [t.clientX - r.left, t.clientY - r.top];
+    };
     el.addEventListener("touchstart", (e) => {
       lastY = e.touches[0].clientY;
+      lastX = e.touches[0].clientX;
       lastT = e.timeStamp;
       acc = 0; velocity = 0;
       cancelAnimationFrame(glide);
@@ -176,24 +239,29 @@
     el.addEventListener("touchmove", (e) => {
       if (lastY == null) return;
       e.preventDefault(); // stop page rubber-banding; taps still focus
-      const y = e.touches[0].clientY;
-      const dy = lastY - y;
+      const t = e.touches[0];
+      const dy = lastY - t.clientY;
       const dt = Math.max(1, e.timeStamp - lastT);
       velocity = dy / dt;
-      lastY = y; lastT = e.timeStamp;
+      lastY = t.clientY; lastX = t.clientX; lastT = e.timeStamp;
       acc += dy;
       const lines = Math.trunc(acc / cell());
-      if (lines) { term.scrollLines(lines); acc -= lines * cell(); }
+      if (lines) {
+        const [x, y] = rel(t);
+        scrollTerm(lines, x, y);
+        acc -= lines * cell();
+      }
     }, { passive: false });
     el.addEventListener("touchend", () => {
       lastY = null;
       let v = velocity * 16; // px per frame
       velocity = 0;
+      const x = lastX - el.getBoundingClientRect().left;
       const step = () => {
         if (Math.abs(v) < 1) return;
         acc += v;
         const lines = Math.trunc(acc / cell());
-        if (lines) { term.scrollLines(lines); acc -= lines * cell(); }
+        if (lines) { scrollTerm(lines, x, el.clientHeight / 2); acc -= lines * cell(); }
         v *= 0.92;
         glide = requestAnimationFrame(step);
       };
@@ -224,62 +292,137 @@
 
   function name(s) { return s.custom || s.title || s.label; }
 
-  function renderTabs() {
-    const el = $("tabs");
-    el.innerHTML = "";
-    sessions.forEach((s, i) => {
-      const b = document.createElement("button");
-      b.className = "tab" + (s.id === current ? " on" : "");
-      const ind = document.createElement("span");
-      if (s.status === "working") ind.className = "spin";
-      else ind.className = "dot " + s.status;
-      b.appendChild(ind);
-      b.appendChild(document.createTextNode(` ${i + 1}: ${name(s)}`));
-      b.onclick = () => select(s.id);
-      el.appendChild(b);
-    });
-    $("empty").style.display = sessions.length ? "none" : "block";
-    $("empty").textContent = sessions.length ? "" : "No terminal sessions in Playdown.";
+  const STATUS_SECTIONS = [
+    { key: "blocked", label: "NEEDS YOU" },
+    { key: "working", label: "WORKING" },
+    { key: "done", label: "DONE" },
+    { key: "idle", label: "IDLE" },
+  ];
+
+  function indicator(status) {
+    const el = document.createElement("span");
+    el.className = status === "working" ? "spin" : "dot " + status;
+    return el;
   }
 
-  function select(id) {
-    current = id;
-    renderTabs();
-    term.reset();
-    ws?.send(JSON.stringify({ op: "attach", id }));
-    // After the scrollback replay lands, the resize's SIGWINCH makes the TUI
-    // redraw itself at phone width.
-    sendResize();
-    term.focus();
+  function renderList() {
+    const root = $("viewList");
+    root.innerHTML = "";
+    if (!sessions.length) {
+      const d = document.createElement("div");
+      d.className = "empty";
+      d.textContent = ws?.readyState === 1 ? "No terminal sessions in Playdown." : "Connecting…";
+      root.appendChild(d);
+      return;
+    }
+    for (const sect of STATUS_SECTIONS) {
+      const items = sessions.filter((s) => s.status === sect.key);
+      if (!items.length) continue;
+      const box = document.createElement("div");
+      box.className = "sect";
+      const h = document.createElement("h2");
+      h.appendChild(indicator(sect.key));
+      h.appendChild(document.createTextNode(sect.label));
+      box.appendChild(h);
+      for (const s of items) {
+        const b = document.createElement("button");
+        b.className = "row" + (s.status === "blocked" ? " blocked" : "");
+        b.appendChild(indicator(s.status));
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const nm = document.createElement("div");
+        nm.className = "nm";
+        nm.textContent = name(s);
+        meta.appendChild(nm);
+        if (s.label && s.label !== name(s)) {
+          const sub = document.createElement("div");
+          sub.className = "sub";
+          sub.textContent = s.label;
+          meta.appendChild(sub);
+        }
+        b.appendChild(meta);
+        const chev = document.createElement("span");
+        chev.className = "chev";
+        chev.textContent = "›";
+        b.appendChild(chev);
+        b.onclick = () => openSession(s.id);
+        box.appendChild(b);
+      }
+      root.appendChild(box);
+    }
+  }
+
+  function renderHeader() {
+    const inTerm = view === "term";
+    $("back").style.display = inTerm ? "block" : "none";
+    $("brand").style.display = inTerm ? "none" : "inline";
+    $("hdrSession").style.display = inTerm ? "inline-flex" : "none";
+    $("count").textContent = inTerm ? "" : (sessions.length || "");
+    if (inTerm) {
+      const s = sessions.find((x) => x.id === current);
+      $("hdrName").textContent = s ? name(s) : "";
+      const d = $("hdrDot");
+      d.className = s?.status === "working" ? "spin" : "dot " + (s?.status || "");
+    }
+  }
+
+  function openSession(id) {
+    view = "term";
+    $("viewList").style.display = "none";
+    $("viewTerm").style.display = "flex";
+    if (!term) initTerm();
+    if (id !== current) {
+      current = id;
+      term.reset();
+      ws?.send(JSON.stringify({ op: "attach", id }));
+      // After the scrollback replay lands, the resize's SIGWINCH makes the
+      // TUI redraw itself at phone width.
+      sendResize();
+    }
+    renderHeader();
+    requestAnimationFrame(() => { refit(); term.focus(); });
+  }
+
+  function goBack() {
+    view = "list";
+    term?.blur(); // let the iOS keyboard close
+    $("viewTerm").style.display = "none";
+    $("viewList").style.display = "block";
+    renderList();
+    renderHeader();
   }
 
   function connect() {
     ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?token=${token}`);
     ws.onopen = () => { $("conn").classList.add("up"); ws.send(JSON.stringify({ op: "sessions" })); };
-    ws.onclose = () => { $("conn").classList.remove("up"); setTimeout(connect, 2000); };
+    ws.onclose = () => {
+      $("conn").classList.remove("up");
+      setTimeout(connect, 2000);
+    };
     ws.onmessage = (m) => {
       let ev;
       try { ev = JSON.parse(m.data); } catch { return; }
       if (ev.ev === "sessions") {
         sessions = ev.sessions || [];
-        if (!current && sessions.length) select(sessions[0].id);
-        else if (current && !sessions.some((s) => s.id === current)) {
+        if (current && !sessions.some((s) => s.id === current)) {
           current = null;
-          term.reset();
-          if (sessions.length) select(sessions[0].id);
+          term?.reset();
+          if (view === "term") goBack();
         }
-        renderTabs();
+        if (view === "list") renderList();
+        renderHeader();
       } else if (ev.ev === "scrollback" && ev.id === current) {
-        term.write(b64ToBytes(ev.data));
+        term?.write(b64ToBytes(ev.data));
       } else if (ev.ev === "output" && ev.id === current) {
-        term.write(b64ToBytes(ev.data));
+        term?.write(b64ToBytes(ev.data));
       }
     };
   }
 
-  initTerm();
+  $("back").addEventListener("click", goBack);
   initKeybar();
-  initTouchScroll();
+  renderList();
+  renderHeader();
   connect();
 </script>
 </body>
