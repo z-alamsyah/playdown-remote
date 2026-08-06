@@ -13,6 +13,8 @@ control your terminal sessions and AI agents from a phone browser.
   terminal. Scan → connected. No accounts, no cloud, no telemetry.
 - 🪶 **One small binary** — xterm.js is embedded; the page makes zero
   external requests.
+- 🤖 **Telegram bot (optional)** — your own bot pings you when an agent
+  blocks or finishes, with inline keys to answer without opening anything.
 
 ## Setup
 
@@ -29,10 +31,33 @@ control your terminal sessions and AI agents from a phone browser.
 
 ```
 USAGE: playdown-remote [OPTIONS]
-  --port <PORT>      HTTP port (default: 7423)
-  --socket <PATH>    Playdown bridge socket (default: ~/.playdown/bridge.sock)
-  --view-only        Disable input from remote clients
+  --port <PORT>           HTTP port (default: 7423)
+  --socket <PATH>         Playdown bridge socket (default: ~/.playdown/bridge.sock)
+  --view-only             Disable input from remote clients
+  --telegram <TOKEN>      Enable the Telegram bot (or env TELEGRAM_BOT_TOKEN)
+  --telegram-chat <ID>    Allowlisted chat id (or env TELEGRAM_CHAT_ID)
 ```
+
+## Telegram bot (optional)
+
+Get pinged the moment an agent needs you — no relay, long polling against
+`api.telegram.org` with **your own bot**:
+
+1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → copy the token.
+2. First run (pairing): `playdown-remote --telegram <token>`, then message
+   your bot anything — it replies with your chat id.
+3. Real run:
+
+   ```bash
+   playdown-remote --telegram <token> --telegram-chat <chat_id>
+   # or: TELEGRAM_BOT_TOKEN=… TELEGRAM_CHAT_ID=… playdown-remote
+   ```
+
+You get: 🔴 *"session needs you"* alerts with the last lines of output and
+inline **Enter / Esc / 1 / 2 / 3 / ^C** keys, 🟢 done notifications, plus
+`/status`, `/send <n> <text>`, and `/tail <n>`. Only the allowlisted chat id
+can interact — every other chat is ignored. With `--view-only` the bot only
+notifies; it can't type.
 
 ## Security model
 

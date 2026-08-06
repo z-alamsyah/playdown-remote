@@ -6,6 +6,7 @@
 //! per-run token (QR printed on startup).
 
 mod bridge;
+mod telegram;
 mod web;
 
 use rand::RngCore;
@@ -15,10 +16,13 @@ fn help() -> ! {
         "playdown-remote — phone access to your Playdown terminal sessions\n\n\
          USAGE: playdown-remote [OPTIONS]\n\n\
          OPTIONS:\n  \
-         --port <PORT>      HTTP port (default: 7423)\n  \
-         --socket <PATH>    Playdown bridge socket (default: ~/.playdown/bridge.sock)\n  \
-         --view-only        Disable input from remote clients\n  \
-         --help             Show this help\n\n\
+         --port <PORT>           HTTP port (default: 7423)\n  \
+         --socket <PATH>         Playdown bridge socket (default: ~/.playdown/bridge.sock)\n  \
+         --view-only             Disable input from remote clients\n  \
+         --telegram <TOKEN>      Enable the Telegram bot (or env TELEGRAM_BOT_TOKEN)\n  \
+         --telegram-chat <ID>    Allowlisted chat id (or env TELEGRAM_CHAT_ID);\n                          \
+         without it the bot only replies with pairing instructions\n  \
+         --help                  Show this help\n\n\
          Enable the bridge first: Playdown → Settings → Terminal & agents → Remote bridge."
     );
     std::process::exit(0);
@@ -29,6 +33,8 @@ async fn main() {
     let mut port: u16 = 7423;
     let mut socket: Option<String> = None;
     let mut view_only = false;
+    let mut tg_token = std::env::var("TELEGRAM_BOT_TOKEN").ok();
+    let mut tg_chat = std::env::var("TELEGRAM_CHAT_ID").ok();
 
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -36,6 +42,8 @@ async fn main() {
             "--port" => port = args.next().and_then(|v| v.parse().ok()).unwrap_or(7423),
             "--socket" => socket = args.next(),
             "--view-only" => view_only = true,
+            "--telegram" => tg_token = args.next(),
+            "--telegram-chat" => tg_chat = args.next(),
             "--help" | "-h" => help(),
             _ => {}
         }
@@ -63,6 +71,13 @@ async fn main() {
     let listener = web::bind(port).await;
 
     let hub = bridge::start(socket_path.clone());
+
+    if let Some(token) = tg_token.filter(|t| !t.is_empty()) {
+        telegram::start(
+            telegram::Config { token, chat_id: tg_chat.filter(|c| !c.is_empty()), view_only },
+            hub.clone(),
+        );
+    }
 
     println!("playdown-remote v{}", env!("CARGO_PKG_VERSION"));
     println!("bridge: {socket_path}");
