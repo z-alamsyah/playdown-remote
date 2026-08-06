@@ -112,7 +112,9 @@ async fn client(socket: WebSocket, st: AppState) {
                     "sessions" | "attach" => {
                         let _ = st.hub.to_bridge.send(text.to_string()).await;
                     }
-                    "input" if !st.view_only => {
+                    // resize is gated too: view-only watchers must not reflow
+                    // the desktop user's terminal.
+                    "input" | "resize" if !st.view_only => {
                         let _ = st.hub.to_bridge.send(text.to_string()).await;
                     }
                     _ => {}

@@ -108,6 +108,22 @@
     ws.send(JSON.stringify({ op: "input", id: current, data: strToB64(d) }));
   }
 
+  // Resize the PTY to this viewport (tmux-style "last client wins") so TUIs
+  // reflow to phone width instead of wrapping 200-col desktop output.
+  let resizeTimer;
+  function sendResize() {
+    if (VIEW_ONLY || !current || ws?.readyState !== 1) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      ws.send(JSON.stringify({ op: "resize", id: current, cols: term.cols, rows: term.rows }));
+    }, 250);
+  }
+
+  function refit() {
+    fit.fit();
+    sendResize();
+  }
+
   function initTerm() {
     term = new Terminal({
       fontSize: 13,
@@ -120,9 +136,9 @@
     term.loadAddon(fit);
     term.open($("term"));
     fit.fit();
-    addEventListener("resize", () => fit.fit());
+    addEventListener("resize", refit);
     // iOS: the keyboard shrinks the visual viewport without a window resize.
-    visualViewport?.addEventListener("resize", () => setTimeout(() => fit.fit(), 50));
+    visualViewport?.addEventListener("resize", () => setTimeout(refit, 50));
     if (!VIEW_ONLY) {
       term.onData((d) => {
         // Sticky Ctrl from the key bar: next letter becomes a control char.
@@ -156,7 +172,7 @@
     });
     const setFont = (delta) => {
       term.options.fontSize = Math.max(8, Math.min(20, term.options.fontSize + delta));
-      fit.fit();
+      refit();
     };
     $("fontMinus").addEventListener("pointerdown", (e) => { e.preventDefault(); setFont(-1); });
     $("fontPlus").addEventListener("pointerdown", (e) => { e.preventDefault(); setFont(1); });
@@ -187,6 +203,9 @@
     renderTabs();
     term.reset();
     ws?.send(JSON.stringify({ op: "attach", id }));
+    // After the scrollback replay lands, the resize's SIGWINCH makes the TUI
+    // redraw itself at phone width.
+    sendResize();
     term.focus();
   }
 
