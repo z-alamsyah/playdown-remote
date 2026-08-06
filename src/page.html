@@ -106,6 +106,9 @@
   function sendData(d) {
     if (VIEW_ONLY || !current || ws?.readyState !== 1) return;
     ws.send(JSON.stringify({ op: "input", id: current, data: strToB64(d) }));
+    // Typing while scrolled up in history: snap back to the live prompt
+    // (input bypasses xterm's own scroll-on-input path).
+    term.scrollToBottom();
   }
 
   // Resize the PTY to this viewport (tmux-style "last client wins") so TUIs
@@ -155,6 +158,47 @@
   function setCtrl(v) {
     ctrlArmed = v;
     $("ctrlKey").classList.toggle("armed", v);
+  }
+
+  // Touch scrolling — xterm.js has no working touch scroll on iOS (touches
+  // land on the screen layer, not the scrollable viewport). Translate drags
+  // into scrollLines, with a light momentum flick.
+  function initTouchScroll() {
+    const el = $("term");
+    let lastY = null, lastT = 0, acc = 0, velocity = 0, glide = 0;
+    const cell = () => el.clientHeight / term.rows;
+    el.addEventListener("touchstart", (e) => {
+      lastY = e.touches[0].clientY;
+      lastT = e.timeStamp;
+      acc = 0; velocity = 0;
+      cancelAnimationFrame(glide);
+    }, { passive: true });
+    el.addEventListener("touchmove", (e) => {
+      if (lastY == null) return;
+      e.preventDefault(); // stop page rubber-banding; taps still focus
+      const y = e.touches[0].clientY;
+      const dy = lastY - y;
+      const dt = Math.max(1, e.timeStamp - lastT);
+      velocity = dy / dt;
+      lastY = y; lastT = e.timeStamp;
+      acc += dy;
+      const lines = Math.trunc(acc / cell());
+      if (lines) { term.scrollLines(lines); acc -= lines * cell(); }
+    }, { passive: false });
+    el.addEventListener("touchend", () => {
+      lastY = null;
+      let v = velocity * 16; // px per frame
+      velocity = 0;
+      const step = () => {
+        if (Math.abs(v) < 1) return;
+        acc += v;
+        const lines = Math.trunc(acc / cell());
+        if (lines) { term.scrollLines(lines); acc -= lines * cell(); }
+        v *= 0.92;
+        glide = requestAnimationFrame(step);
+      };
+      glide = requestAnimationFrame(step);
+    }, { passive: true });
   }
 
   function initKeybar() {
@@ -235,6 +279,7 @@
 
   initTerm();
   initKeybar();
+  initTouchScroll();
   connect();
 </script>
 </body>
