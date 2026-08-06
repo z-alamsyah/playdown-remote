@@ -24,7 +24,23 @@ struct AppState {
     view_only: bool,
 }
 
-pub async fn serve(port: u16, token: String, hub: Arc<Hub>, view_only: bool) {
+/// Bind the port up front so a conflict fails fast, before any URLs print.
+pub async fn bind(port: u16) -> tokio::net::TcpListener {
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
+    match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!(
+                "Failed to bind port {port}: {e}\n\
+                 Is another playdown-remote already running? \
+                 Stop it or pick a different port with --port."
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
+pub async fn serve(listener: tokio::net::TcpListener, token: String, hub: Arc<Hub>, view_only: bool) {
     let state = AppState { hub, token: Arc::new(token), view_only };
     let app = Router::new()
         .route("/", get(page))
@@ -35,14 +51,6 @@ pub async fn serve(port: u16, token: String, hub: Arc<Hub>, view_only: bool) {
         .route("/ws", get(ws_upgrade))
         .with_state(state);
 
-    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
-    let listener = match tokio::net::TcpListener::bind(addr).await {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("Failed to bind port {port}: {e}");
-            std::process::exit(1);
-        }
-    };
     axum::serve(listener, app).await.expect("server error");
 }
 

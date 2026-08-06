@@ -58,6 +58,10 @@ async fn main() {
     rand::thread_rng().fill_bytes(&mut token_bytes);
     let token: String = token_bytes.iter().map(|b| format!("{b:02x}")).collect();
 
+    // Bind BEFORE printing URLs/QR — otherwise a port conflict surfaces after
+    // a full page of output that looks like a successful start.
+    let listener = web::bind(port).await;
+
     let hub = bridge::start(socket_path.clone());
 
     println!("playdown-remote v{}", env!("CARGO_PKG_VERSION"));
@@ -95,5 +99,5 @@ async fn main() {
     }
     println!("\nOpen the URL on your phone (same LAN or Tailscale). Ctrl+C to stop.");
 
-    web::serve(port, token, hub, view_only).await;
+    web::serve(listener, token, hub, view_only).await;
 }
