@@ -43,6 +43,19 @@
   main { flex: 1; min-height: 0; padding: 6px 4px 8px 8px; }
   #term { height: 100%; }
   .empty { color: #6e7681; font-size: 14px; padding: 24px; text-align: center; }
+  /* Terminal key bar — iOS keyboards have no Esc/arrows, TUIs need them */
+  .keybar {
+    display: flex; gap: 6px; padding: 6px 8px; flex-shrink: 0;
+    border-top: 1px solid #30363d; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  .keybar button {
+    min-width: 44px; padding: 8px 10px; border-radius: 7px; border: 1px solid #30363d;
+    background: #21262d; color: #e6edf3; font-size: 13px;
+    font-family: ui-monospace, Menlo, monospace; flex-shrink: 0;
+    touch-action: manipulation;
+  }
+  .keybar button:active { background: #30363d; }
+  .keybar button.armed { background: #1c4f9c; border-color: #58a6ff; }
 </style>
 </head>
 <body>
@@ -52,6 +65,19 @@
     <div class="tabs" id="tabs"></div>
   </header>
   <main><div id="term"></div><div class="empty" id="empty">Connecting…</div></main>
+  <div class="keybar" id="keybar">
+    <button data-seq="&#27;">esc</button>
+    <button data-seq="&#9;">tab</button>
+    <button id="ctrlKey">ctrl</button>
+    <button data-seq="&#27;[A">↑</button>
+    <button data-seq="&#27;[B">↓</button>
+    <button data-seq="&#27;[D">←</button>
+    <button data-seq="&#27;[C">→</button>
+    <button data-seq="&#13;">↵</button>
+    <button data-seq="&#3;">^C</button>
+    <button id="fontMinus">A−</button>
+    <button id="fontPlus">A+</button>
+  </div>
 
 <script src="/assets/xterm.js"></script>
 <script src="/assets/addon-fit.js"></script>
@@ -75,6 +101,13 @@
     return btoa(bin);
   }
 
+  let ctrlArmed = false;
+
+  function sendData(d) {
+    if (VIEW_ONLY || !current || ws?.readyState !== 1) return;
+    ws.send(JSON.stringify({ op: "input", id: current, data: strToB64(d) }));
+  }
+
   function initTerm() {
     term = new Terminal({
       fontSize: 13,
@@ -88,13 +121,45 @@
     term.open($("term"));
     fit.fit();
     addEventListener("resize", () => fit.fit());
+    // iOS: the keyboard shrinks the visual viewport without a window resize.
+    visualViewport?.addEventListener("resize", () => setTimeout(() => fit.fit(), 50));
     if (!VIEW_ONLY) {
       term.onData((d) => {
-        if (current && ws?.readyState === 1) {
-          ws.send(JSON.stringify({ op: "input", id: current, data: strToB64(d) }));
+        // Sticky Ctrl from the key bar: next letter becomes a control char.
+        if (ctrlArmed && d.length === 1) {
+          const c = d.toLowerCase().charCodeAt(0);
+          if (c >= 97 && c <= 122) d = String.fromCharCode(c - 96);
+          setCtrl(false);
         }
+        sendData(d);
       });
     }
+  }
+
+  function setCtrl(v) {
+    ctrlArmed = v;
+    $("ctrlKey").classList.toggle("armed", v);
+  }
+
+  function initKeybar() {
+    // pointerdown + preventDefault: send the key WITHOUT stealing focus from
+    // the terminal (a click would close the iOS keyboard).
+    for (const b of document.querySelectorAll(".keybar button[data-seq]")) {
+      b.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        sendData(b.dataset.seq);
+      });
+    }
+    $("ctrlKey").addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      setCtrl(!ctrlArmed);
+    });
+    const setFont = (delta) => {
+      term.options.fontSize = Math.max(8, Math.min(20, term.options.fontSize + delta));
+      fit.fit();
+    };
+    $("fontMinus").addEventListener("pointerdown", (e) => { e.preventDefault(); setFont(-1); });
+    $("fontPlus").addEventListener("pointerdown", (e) => { e.preventDefault(); setFont(1); });
   }
 
   function name(s) { return s.custom || s.title || s.label; }
@@ -150,6 +215,7 @@
   }
 
   initTerm();
+  initKeybar();
   connect();
 </script>
 </body>
