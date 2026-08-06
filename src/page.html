@@ -14,6 +14,10 @@
     display: flex; flex-direction: column;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
+    /* Pinned so iOS can't pan the layout when the keyboard opens; the height
+       is synced to visualViewport so nothing hides behind the keyboard. */
+    position: fixed; inset: 0; width: 100%;
+    overscroll-behavior: none;
   }
   header {
     display: flex; align-items: center; gap: 10px;
@@ -115,6 +119,7 @@
 
 <script src="/assets/xterm.js"></script>
 <script src="/assets/addon-fit.js"></script>
+<script src="/assets/addon-webgl.js"></script>
 <script>
   const VIEW_ONLY = __VIEW_ONLY__;
   const token = (location.hash.match(/t=([0-9a-f]+)/) || [])[1] || "";
@@ -164,6 +169,24 @@
     sendResize();
   }
 
+  // iOS keyboard: it overlays the page without resizing the layout viewport,
+  // hiding the key bar and the terminal's bottom. Sync the body height to the
+  // visual viewport and pin the scroll so everything stays above the keyboard.
+  let vvTimer;
+  function syncViewport() {
+    clearTimeout(vvTimer);
+    vvTimer = setTimeout(() => {
+      const vv = visualViewport;
+      if (vv) {
+        document.body.style.height = Math.round(vv.height) + "px";
+        window.scrollTo(0, 0);
+      }
+      refit();
+    }, 50);
+  }
+  visualViewport?.addEventListener("resize", syncViewport);
+  visualViewport?.addEventListener("scroll", syncViewport);
+
   function initTerm() {
     term = new Terminal({
       fontSize: 13,
@@ -175,10 +198,15 @@
     fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
     term.open($("term"));
+    // GPU renderer — the DOM renderer chokes on full-screen TUI repaints
+    // (every scroll step redraws the whole screen). Graceful fallback.
+    try {
+      const gl = new WebglAddon.WebglAddon();
+      gl.onContextLoss(() => gl.dispose());
+      term.loadAddon(gl);
+    } catch { /* old WebView → DOM renderer */ }
     fit.fit();
     addEventListener("resize", refit);
-    // iOS: the keyboard shrinks the visual viewport without a window resize.
-    visualViewport?.addEventListener("resize", () => setTimeout(refit, 50));
     if (!VIEW_ONLY) {
       term.onData((d) => {
         // Sticky Ctrl from the key bar: next letter becomes a control char.
@@ -202,17 +230,30 @@
   // tracking and keep their history INTERNALLY (they repaint in place, so
   // xterm's scrollback has nothing to show) — for those, send SGR wheel
   // reports at the touch position, exactly what a desktop mouse wheel sends.
+  // Reports are batched per animation frame into ONE message: the TUI
+  // processes them in a single input read and repaints once, instead of
+  // one full-screen redraw per report (that flood was the scroll lag).
   // Plain shells get local scrollback via scrollLines.
+  let wheelAcc = 0, wheelPos = [1, 1], wheelRaf = 0;
+  function flushWheel() {
+    wheelRaf = 0;
+    const n = Math.max(-6, Math.min(6, wheelAcc));
+    wheelAcc = 0;
+    if (!n) return;
+    const btn = n > 0 ? 65 : 64; // 65 = wheel down, 64 = wheel up
+    sendRaw(`\x1b[<${btn};${wheelPos[0]};${wheelPos[1]}M`.repeat(Math.abs(n)));
+  }
   function scrollTerm(lines, x, y) {
     if (!lines) return;
     const mt = term.modes?.mouseTrackingMode;
     if (mt && mt !== "none" && !VIEW_ONLY) {
       const el = $("term");
-      const col = Math.max(1, Math.min(term.cols, Math.ceil(x / (el.clientWidth / term.cols))));
-      const row = Math.max(1, Math.min(term.rows, Math.ceil(y / (el.clientHeight / term.rows))));
-      const btn = lines > 0 ? 65 : 64; // 65 = wheel down, 64 = wheel up
-      const n = Math.min(8, Math.abs(lines));
-      for (let i = 0; i < n; i++) sendRaw(`\x1b[<${btn};${col};${row}M`);
+      wheelPos = [
+        Math.max(1, Math.min(term.cols, Math.ceil(x / (el.clientWidth / term.cols)))),
+        Math.max(1, Math.min(term.rows, Math.ceil(y / (el.clientHeight / term.rows)))),
+      ];
+      wheelAcc += lines;
+      if (!wheelRaf) wheelRaf = requestAnimationFrame(flushWheel);
     } else {
       term.scrollLines(lines);
     }

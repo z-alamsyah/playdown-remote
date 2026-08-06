@@ -15,6 +15,7 @@ const PAGE: &str = include_str!("page.html");
 const XTERM_JS: &str = include_str!("../assets/xterm.js");
 const XTERM_CSS: &str = include_str!("../assets/xterm.css");
 const FIT_JS: &str = include_str!("../assets/addon-fit.js");
+const WEBGL_JS: &str = include_str!("../assets/addon-webgl.js");
 
 #[derive(Clone)]
 struct AppState {
@@ -29,6 +30,7 @@ pub async fn serve(port: u16, token: String, hub: Arc<Hub>, view_only: bool) {
         .route("/", get(page))
         .route("/assets/xterm.js", get(|| async { js(XTERM_JS) }))
         .route("/assets/addon-fit.js", get(|| async { js(FIT_JS) }))
+        .route("/assets/addon-webgl.js", get(|| async { js(WEBGL_JS) }))
         .route("/assets/xterm.css", get(|| async { css(XTERM_CSS) }))
         .route("/ws", get(ws_upgrade))
         .with_state(state);
