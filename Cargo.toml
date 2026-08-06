@@ -1,0 +1,22 @@
+[package]
+name = "playdown-remote"
+version = "0.1.0"
+description = "Remote access companion for Playdown — control your terminal sessions and agents from a phone browser"
+authors = ["z-alamsyah"]
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["net", "io-util", "sync", "rt-multi-thread", "macros", "time"] }
+axum = { version = "0.8", features = ["ws"] }
+serde_json = "1"
+base64 = "0.22"
+rand = "0.8"
+qrcode = "0.14"
+local-ip-address = "0.6"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
