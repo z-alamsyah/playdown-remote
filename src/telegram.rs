@@ -19,12 +19,19 @@ pub struct Config {
     pub view_only: bool,
 }
 
+/// Virtual screen size: wide enough for a desktop-sized PTY (cursor writes
+/// beyond the grid are clamped), tall enough to hold a full TUI frame.
+const VT_ROWS: u16 = 60;
+const VT_COLS: u16 = 240;
+
 struct State {
     cfg: Config,
     hub: Arc<Hub>,
     http: reqwest::Client,
-    /// Rolling plain-text output tail per session (for alerts and /tail).
-    tails: Mutex<HashMap<String, String>>,
+    /// Per-session virtual terminal. TUIs (Claude Code) repaint the screen
+    /// with cursor positioning — the raw byte stream is unreadable soup, but
+    /// the RENDERED screen is exactly what the user would see on the desktop.
+    screens: Mutex<HashMap<String, vt100::Parser>>,
 }
 
 pub fn start(cfg: Config, hub: Arc<Hub>) {
@@ -32,7 +39,7 @@ pub fn start(cfg: Config, hub: Arc<Hub>) {
         cfg,
         hub,
         http: reqwest::Client::new(),
-        tails: Mutex::new(HashMap::new()),
+        screens: Mutex::new(HashMap::new()),
     });
     tokio::spawn(announce(st.clone()));
     tokio::spawn(watch_events(st.clone()));
@@ -100,39 +107,18 @@ async fn announce(st: Arc<State>) {
     }
 }
 
-/// Minimal ANSI stripper: drops CSI/OSC sequences and carriage returns so
-/// TUI output reads as plain text in chat messages.
-fn strip_ansi(s: &str) -> String {
-    let mut out = String::new();
-    let mut it = s.chars().peekable();
-    while let Some(c) = it.next() {
-        match c {
-            '\x1b' => match it.next() {
-                Some('[') => {
-                    for n in it.by_ref() {
-                        if n.is_ascii_alphabetic() || n == '~' {
-                            break;
-                        }
-                    }
-                }
-                Some(']') => {
-                    while let Some(n) = it.next() {
-                        if n == '\x07' {
-                            break;
-                        }
-                        if n == '\x1b' {
-                            let _ = it.next();
-                            break;
-                        }
-                    }
-                }
-                _ => {}
-            },
-            '\r' | '\x07' => {}
-            _ => out.push(c),
-        }
+/// Screen-line cleanup for chat: drop trailing whitespace, box borders, and
+/// lines that are nothing but box drawing.
+fn clean_line(l: &str) -> String {
+    let t = l.trim_end();
+    let t = t.trim_matches(|c: char| matches!(c, '│' | '┃' | '║')).trim();
+    if t.chars().all(|c| {
+        c.is_whitespace()
+            || matches!(c, '─' | '━' | '═' | '╭' | '╮' | '╰' | '╯' | '┌' | '┐' | '└' | '┘' | '├' | '┤' | '┬' | '┴' | '┼')
+    }) {
+        return String::new();
     }
-    out
+    t.to_string()
 }
 
 fn status_emoji(status: &str) -> &'static str {
@@ -153,13 +139,19 @@ fn session_name(s: &Value) -> String {
         .to_string()
 }
 
-/// Last few meaningful lines of a session's output tail.
-fn tail_snippet(st: &State, id: &str) -> Option<String> {
-    let tails = st.tails.lock().unwrap();
-    let t = tails.get(id)?;
-    let lines: Vec<&str> = t.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).collect();
-    let take = lines.len().min(6);
-    let snip = lines[lines.len() - take..].join("\n");
+/// Last `max_lines` meaningful lines of a session's RENDERED screen.
+fn tail_snippet(st: &State, id: &str, max_lines: usize) -> Option<String> {
+    let screens = st.screens.lock().unwrap();
+    let parser = screens.get(id)?;
+    let contents = parser.screen().contents();
+    let lines: Vec<String> = contents.lines().map(clean_line).filter(|l| !l.is_empty()).collect();
+    let take = lines.len().min(max_lines);
+    let mut snip = lines[lines.len() - take..].join("\n");
+    if snip.len() > 3200 {
+        let cut = snip.len() - 3200;
+        let cut = snip.char_indices().map(|(i, _)| i).find(|&i| i >= cut).unwrap_or(0);
+        snip = snip[cut..].to_string();
+    }
     if snip.is_empty() { None } else { Some(snip) }
 }
 
@@ -190,6 +182,15 @@ async fn watch_events(st: Arc<State>) {
             }
         }
     }
+    // Attach to every seeded session so the scrollback replay fills the
+    // virtual screens — /tail works even for tabs quiet since before start.
+    for id in statuses.keys() {
+        st.screens
+            .lock()
+            .unwrap()
+            .insert(id.clone(), vt100::Parser::new(VT_ROWS, VT_COLS, 0));
+        let _ = st.hub.to_bridge.send(json!({ "op": "attach", "id": id }).to_string()).await;
+    }
     let b64 = base64::engine::general_purpose::STANDARD;
     loop {
         let line = match rx.recv().await {
@@ -199,18 +200,15 @@ async fn watch_events(st: Arc<State>) {
         };
         let Ok(ev) = serde_json::from_str::<Value>(&line) else { continue };
         match ev["ev"].as_str() {
-            Some("output") => {
+            // Both live output and the attach replay feed the virtual screen.
+            Some("output") | Some("scrollback") => {
                 let (Some(id), Some(data)) = (ev["id"].as_str(), ev["data"].as_str()) else { continue };
                 let Ok(bytes) = b64.decode(data) else { continue };
-                let text = strip_ansi(&String::from_utf8_lossy(&bytes));
-                let mut tails = st.tails.lock().unwrap();
-                let t = tails.entry(id.to_string()).or_default();
-                t.push_str(&text);
-                if t.len() > 2000 {
-                    let cut = t.len() - 2000;
-                    let cut = t.char_indices().map(|(i, _)| i).find(|&i| i >= cut).unwrap_or(0);
-                    t.drain(..cut);
-                }
+                let mut screens = st.screens.lock().unwrap();
+                screens
+                    .entry(id.to_string())
+                    .or_insert_with(|| vt100::Parser::new(VT_ROWS, VT_COLS, 0))
+                    .process(&bytes);
             }
             Some("sessions") => {
                 let Some(list) = ev["sessions"].as_array() else { continue };
@@ -218,6 +216,16 @@ async fn watch_events(st: Arc<State>) {
                 for s in list {
                     let (Some(id), Some(status)) = (s["id"].as_str(), s["status"].as_str()) else { continue };
                     seen.push(id.to_string());
+                    // Attach once per session so the scrollback replay seeds
+                    // the screen — /tail works even for tabs quiet since
+                    // before this process started.
+                    if !st.screens.lock().unwrap().contains_key(id) {
+                        st.screens
+                            .lock()
+                            .unwrap()
+                            .insert(id.to_string(), vt100::Parser::new(VT_ROWS, VT_COLS, 0));
+                        let _ = st.hub.to_bridge.send(json!({ "op": "attach", "id": id }).to_string()).await;
+                    }
                     let prev = statuses.insert(id.to_string(), status.to_string());
                     let Some(prev) = prev else { continue }; // first sight — no alert spam on connect
                     if prev == status {
@@ -226,7 +234,7 @@ async fn watch_events(st: Arc<State>) {
                     let name = esc_html(&session_name(s));
                     if status == "blocked" {
                         let mut text = format!("🔴 <b>{name}</b> needs you");
-                        if let Some(snip) = tail_snippet(&st, id) {
+                        if let Some(snip) = tail_snippet(&st, id, 8) {
                             text.push_str(&format!("\n<pre>{}</pre>", esc_html(&snip)));
                         }
                         let kb = if st.cfg.view_only { None } else { Some(keys_keyboard(id)) };
@@ -236,7 +244,7 @@ async fn watch_events(st: Arc<State>) {
                     }
                 }
                 statuses.retain(|id, _| seen.contains(id));
-                st.tails.lock().unwrap().retain(|id, _| seen.contains(id));
+                st.screens.lock().unwrap().retain(|id, _| seen.contains(id));
             }
             _ => {}
         }
@@ -324,7 +332,7 @@ async fn handle_command(st: &Arc<State>, chat: &str, text: &str) {
             let rows = session_rows(st);
             match n.and_then(|n| rows.get(n.wrapping_sub(1))) {
                 Some((id, name, _)) => {
-                    let snip = tail_snippet(st, id).unwrap_or_else(|| "(no recent output)".into());
+                    let snip = tail_snippet(st, id, 25).unwrap_or_else(|| "(no recent output)".into());
                     send_text(st, chat, &format!("<b>{}</b>\n<pre>{}</pre>", esc_html(name), esc_html(&snip)), None).await;
                 }
                 None => send_text(st, chat, "Usage: /tail <n> — n from /status", None).await,
