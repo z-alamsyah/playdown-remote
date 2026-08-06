@@ -1,0 +1,80 @@
+name: Release
+
+# Build & publish binaries when a version tag (vX.Y.Z) is pushed:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest # Apple Silicon
+            target: aarch64-apple-darwin
+            name: darwin-arm64
+          - platform: macos-13 # Intel
+            target: x86_64-apple-darwin
+            name: darwin-x64
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            name: linux-x64
+          - platform: ubuntu-22.04-arm # Jetson & friends
+            target: aarch64-unknown-linux-gnu
+            name: linux-arm64
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          ASSET="playdown-remote-${{ github.ref_name }}-${{ matrix.name }}.tar.gz"
+          tar -C "target/${{ matrix.target }}/release" -czf "$ASSET" playdown-remote
+          shasum -a 256 "$ASSET" > "$ASSET.sha256"
+
+      - name: Upload to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "playdown-remote ${{ github.ref_name }}" \
+            --notes "Remote access companion for Playdown. Download the binary for your platform below." \
+            --draft 2>/dev/null || true
+          gh release upload "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            playdown-remote-*.tar.gz playdown-remote-*.sha256 --clobber
+
+  # Flip the draft to a published "latest" release only after every platform
+  # has finished uploading, so `releases/latest` never serves a partial set.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --draft=false --latest
