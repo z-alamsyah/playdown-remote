@@ -87,14 +87,17 @@ async fn main() {
     for u in &urls {
         println!("  {u}");
     }
-    if let Some(first) = urls.first() {
-        let plain = first.split_whitespace().next().unwrap_or(first);
+    // One QR per URL: the LAN address only works on the same network, the
+    // Tailscale one works anywhere — scan whichever fits.
+    for u in &urls {
+        let plain = u.split_whitespace().next().unwrap_or(u);
+        let label = if u.contains("tailscale") { "TAILSCALE (works anywhere)" } else { "LAN (same wifi only)" };
         if let Ok(code) = qrcode::QrCode::new(plain.as_bytes()) {
             let art = code
                 .render::<qrcode::render::unicode::Dense1x2>()
                 .quiet_zone(true)
                 .build();
-            println!("\n{art}");
+            println!("\n  ▼ {label}\n{art}");
         }
     }
     println!("\nOpen the URL on your phone (same LAN or Tailscale). Ctrl+C to stop.");
