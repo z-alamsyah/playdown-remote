@@ -81,12 +81,29 @@ for the socket contract — you can build your own companions on it.
 
 ## Install
 
-Grab a binary from [Releases](https://github.com/z-alamsyah/playdown-remote/releases/latest)
-(macOS arm64/x64, Linux x64/arm64 — Jetson included), then:
+One-liner (macOS arm64/x64, Linux x64/arm64 — Jetson included):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/z-alamsyah/playdown-remote/main/install.sh | sh
+```
+
+Puts the binary in `/usr/local/bin` (or `~/.local/bin` if not writable).
+Then just run:
+
+```bash
+playdown-remote
+```
+
+<details>
+<summary>Manual install / build from source</summary>
+
+Download the tarball for your platform from
+[Releases](https://github.com/z-alamsyah/playdown-remote/releases/latest), then:
 
 ```bash
 tar xzf playdown-remote-v*-<platform>.tar.gz
-./playdown-remote
+sudo mv playdown-remote /usr/local/bin/   # or anywhere on your PATH
+playdown-remote
 ```
 
 Or build from source:
@@ -94,6 +111,7 @@ Or build from source:
 ```bash
 cargo build --release   # → target/release/playdown-remote
 ```
+</details>
 
 ## License
 
