@@ -22,6 +22,8 @@ fn help() -> ! {
          --telegram <TOKEN>      Enable the Telegram bot (or env TELEGRAM_BOT_TOKEN)\n  \
          --telegram-chat <ID>    Allowlisted chat id (or env TELEGRAM_CHAT_ID);\n                          \
          without it the bot only replies with pairing instructions\n  \
+         --json                  Print a machine-readable ready line (for supervisors)\n  \
+         --parent-pid <PID>      Exit when that process dies (supervised mode)\n  \
          --help                  Show this help\n\n\
          Enable the bridge first: Playdown → Settings → Terminal & agents → Remote bridge."
     );
