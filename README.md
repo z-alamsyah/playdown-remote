@@ -79,7 +79,17 @@ phone browser ── WS (token) ──► playdown-remote ── unix socket ─
 See [`BRIDGE_PROTOCOL.md`](https://github.com/z-alamsyah/playdown/blob/main/BRIDGE_PROTOCOL.md)
 for the socket contract — you can build your own companions on it.
 
-## Build
+## Install
+
+Grab a binary from [Releases](https://github.com/z-alamsyah/playdown-remote/releases/latest)
+(macOS arm64/x64, Linux x64/arm64 — Jetson included), then:
+
+```bash
+tar xzf playdown-remote-v*-<platform>.tar.gz
+./playdown-remote
+```
+
+Or build from source:
 
 ```bash
 cargo build --release   # → target/release/playdown-remote
