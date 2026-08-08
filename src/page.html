@@ -239,18 +239,43 @@
     $("ctrlKey").classList.toggle("armed", v);
   }
 
-  // Scroll the terminal by N lines. TUIs like Claude Code enable mouse
-  // tracking and keep their history INTERNALLY (they repaint in place, so
-  // xterm's scrollback has nothing to show) — for those, send SGR wheel
-  // reports at the touch position, exactly what a desktop mouse wheel sends.
-  // Reports are batched per animation frame into ONE message: the TUI
-  // processes them in a single input read and repaints once, instead of
-  // one full-screen redraw per report (that flood was the scroll lag).
-  // Plain shells get local scrollback via scrollLines.
+  // --- terminal interaction modes -----------------------------------------
+  // mouseOn(): the app (Claude Code, tmux w/ mouse, herdr/bubbletea) captures
+  // the mouse — forward touch gestures as SGR mouse reports.
+  // altScreen(): full-screen TUI without its own scrollback.
+  const mouseOn = () => {
+    const mt = term.modes?.mouseTrackingMode;
+    return mt && mt !== "none" && !VIEW_ONLY;
+  };
+  const altScreen = () => term.buffer?.active?.type === "alternate";
+  function cellPos(x, y) {
+    const el = $("term");
+    return [
+      Math.max(1, Math.min(term.cols, Math.ceil(x / (el.clientWidth / term.cols)))),
+      Math.max(1, Math.min(term.rows, Math.ceil(y / (el.clientHeight / term.rows)))),
+    ];
+  }
+
+  // Tap = mouse click (press + release) at the touched cell. This is how you
+  // switch herdr/tmux tabs or pick list rows from the phone.
+  function sendTap(x, y) {
+    if (!mouseOn()) return;
+    const [c, r] = cellPos(x, y);
+    sendRaw(`\x1b[<0;${c};${r}M\x1b[<0;${c};${r}m`);
+  }
+
+  // Scroll the terminal by N lines.
+  // - App captures the mouse (Claude Code, tmux w/ mouse, herdr): SGR wheel
+  //   reports at the touch position, batched per animation frame into ONE
+  //   message — one input read, one repaint (a flood of single reports is a
+  //   redraw storm that garbles TUIs).
+  // - Alt-screen without mouse (plain tmux, less): arrow keys — the alt
+  //   buffer has no scrollback, scrollLines would be a no-op.
+  // - Plain shells: local scrollback via scrollLines.
   let wheelAcc = 0, wheelPos = [1, 1], wheelRaf = 0;
   function flushWheel() {
     wheelRaf = 0;
-    const n = Math.max(-6, Math.min(6, wheelAcc));
+    const n = Math.max(-4, Math.min(4, wheelAcc));
     wheelAcc = 0;
     if (!n) return;
     const btn = n > 0 ? 65 : 64; // 65 = wheel down, 64 = wheel up
@@ -258,15 +283,14 @@
   }
   function scrollTerm(lines, x, y) {
     if (!lines) return;
-    const mt = term.modes?.mouseTrackingMode;
-    if (mt && mt !== "none" && !VIEW_ONLY) {
-      const el = $("term");
-      wheelPos = [
-        Math.max(1, Math.min(term.cols, Math.ceil(x / (el.clientWidth / term.cols)))),
-        Math.max(1, Math.min(term.rows, Math.ceil(y / (el.clientHeight / term.rows)))),
-      ];
+    if (mouseOn()) {
+      wheelPos = cellPos(x, y);
       wheelAcc += lines;
       if (!wheelRaf) wheelRaf = requestAnimationFrame(flushWheel);
+    } else if (altScreen()) {
+      if (VIEW_ONLY) return;
+      const key = lines > 0 ? "\x1b[B" : "\x1b[A";
+      sendRaw(key.repeat(Math.min(4, Math.abs(lines))));
     } else {
       term.scrollLines(lines);
     }
@@ -278,6 +302,7 @@
   function initTouchScroll() {
     const el = $("term");
     let lastY = null, lastT = 0, lastX = 0, acc = 0, velocity = 0, glide = 0;
+    let startX = 0, startY = 0, startT = 0, moved = false;
     const cell = () => el.clientHeight / term.rows;
     const rel = (t) => {
       const r = el.getBoundingClientRect();
@@ -287,6 +312,7 @@
       lastY = e.touches[0].clientY;
       lastX = e.touches[0].clientX;
       lastT = e.timeStamp;
+      startX = lastX; startY = lastY; startT = e.timeStamp; moved = false;
       acc = 0; velocity = 0;
       cancelAnimationFrame(glide);
     }, { passive: true });
@@ -294,6 +320,7 @@
       if (lastY == null) return;
       e.preventDefault(); // stop page rubber-banding; taps still focus
       const t = e.touches[0];
+      if (Math.abs(t.clientX - startX) + Math.abs(t.clientY - startY) > 10) moved = true;
       const dy = lastY - t.clientY;
       const dt = Math.max(1, e.timeStamp - lastT);
       velocity = dy / dt;
@@ -306,8 +333,19 @@
         acc -= lines * cell();
       }
     }, { passive: false });
-    el.addEventListener("touchend", () => {
+    el.addEventListener("touchend", (e) => {
       lastY = null;
+      // Quick tap on a mouse-capturing TUI → forward as a click (switch
+      // herdr/tmux tabs, pick list rows). xterm still takes focus normally.
+      if (!moved && e.timeStamp - startT < 350) {
+        const r = el.getBoundingClientRect();
+        sendTap(startX - r.left, startY - r.top);
+        velocity = 0;
+        return;
+      }
+      // Momentum only for LOCAL scrollback — gliding into a TUI would spray
+      // wheel/arrow input and garble it.
+      if (mouseOn() || altScreen()) { velocity = 0; return; }
       let v = velocity * 16; // px per frame
       velocity = 0;
       const x = lastX - el.getBoundingClientRect().left;
