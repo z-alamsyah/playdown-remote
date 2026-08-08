@@ -64,7 +64,10 @@ fn css(body: &'static str) -> Response {
 async fn page(State(st): State<AppState>) -> Html<String> {
     // The token itself never reaches the server via the page URL (it lives in
     // the #fragment); only the WS handshake carries it.
-    Html(PAGE.replace("__VIEW_ONLY__", if st.view_only { "true" } else { "false" }))
+    Html(
+        PAGE.replace("__VIEW_ONLY__", if st.view_only { "true" } else { "false" })
+            .replace("__VERSION__", env!("CARGO_PKG_VERSION")),
+    )
 }
 
 /// Constant-time-ish comparison (length check + XOR fold).

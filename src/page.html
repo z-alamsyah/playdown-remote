@@ -72,6 +72,7 @@
   }
   .row .x:active { background: #30363d; color: #f85149; }
   .empty { color: #6e7681; font-size: 14px; padding: 40px 20px; text-align: center; }
+  .ver { color: #484f58; font-size: 11px; text-align: center; padding: 14px 0 4px; }
 
   .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #6e7681; background: transparent; flex-shrink: 0; }
   .dot.blocked { background: #f85149; border-color: #f85149; }
@@ -135,6 +136,7 @@
 <script src="/assets/addon-webgl.js"></script>
 <script>
   const VIEW_ONLY = __VIEW_ONLY__;
+  const VERSION = "__VERSION__";
   const token = (location.hash.match(/t=([0-9a-f]+)/) || [])[1] || "";
   let ws, sessions = [], current = null, term, fit, view = "list";
 
@@ -335,11 +337,15 @@
     }, { passive: false });
     el.addEventListener("touchend", (e) => {
       lastY = null;
-      // Quick tap on a mouse-capturing TUI → forward as a click (switch
-      // herdr/tmux tabs, pick list rows). xterm still takes focus normally.
-      if (!moved && e.timeStamp - startT < 350) {
+      // Quick tap on a mouse-capturing TUI → forward as ONE click (switch
+      // herdr/tmux tabs, pick list rows). preventDefault stops iOS from
+      // synthesizing mousedown/mouseup afterwards — xterm would translate
+      // those into a SECOND click report (tap → switch → switch back).
+      if (!moved && e.timeStamp - startT < 350 && mouseOn()) {
+        e.preventDefault();
         const r = el.getBoundingClientRect();
         sendTap(startX - r.left, startY - r.top);
+        term.focus(); // preventDefault also suppressed the focus click
         velocity = 0;
         return;
       }
@@ -358,7 +364,7 @@
         glide = requestAnimationFrame(step);
       };
       glide = requestAnimationFrame(step);
-    }, { passive: true });
+    }, { passive: false });
   }
 
   function initKeybar() {
@@ -469,6 +475,10 @@
       }
       root.appendChild(box);
     }
+    const ver = document.createElement("div");
+    ver.className = "ver";
+    ver.textContent = `playdown-remote v${VERSION}`;
+    root.appendChild(ver);
   }
 
   function renderHeader() {
