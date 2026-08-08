@@ -1,6 +1,6 @@
 [package]
 name = "playdown-remote"
-version = "0.2.1"
+version = "0.2.2"
 description = "Remote access companion for Playdown — control your terminal sessions and agents from a phone browser"
 authors = ["z-alamsyah"]
 license = "MIT"
