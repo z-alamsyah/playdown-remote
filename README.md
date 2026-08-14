@@ -1,7 +1,10 @@
 # playdown-remote
 
 Remote access companion for [Playdown](https://github.com/z-alamsyah/playdown) —
-control your terminal sessions and AI agents from a phone browser.
+supervise your terminal sessions and the coding agents running in them from a
+phone browser or Telegram. It **remotes the terminal, not the harness** — so it
+works with any coding agent (Claude Code, Cursor CLI, aider, opencode, …) or
+any plain TUI, unmodified.
 
 - 📱 **Web terminal** — every Playdown session as a tab, with the same agent
   status at a glance (working / blocked / done), live output, full input
