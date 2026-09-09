@@ -68,7 +68,12 @@ async fn main() {
                     .map(|s| s.success())
                     .unwrap_or(false);
                 if !alive {
-                    eprintln!("[supervise] parent {pid} gone — exiting");
+                    // The parent dying usually breaks our stdout/stderr pipes
+                    // too, and eprintln! PANICS on a failed write - which
+                    // killed this task before it could exit, leaving an
+                    // orphaned server behind. Write defensively, then leave.
+                    use std::io::Write;
+                    let _ = writeln!(std::io::stderr(), "[supervise] parent {pid} gone - exiting");
                     std::process::exit(0);
                 }
             }
