@@ -12,7 +12,35 @@ permissions:
   contents: write
 
 jobs:
+  # Create the draft ONCE and hand its id to every build. Letting each matrix
+  # job run `gh release create` is a race: two jobs can both create a draft for
+  # the same tag, and a draft has no tag attached yet ("untagged-..."), so the
+  # follow-up `gh release upload <tag>` finds neither - v0.2.4 first shipped as
+  # two empty drafts that way.
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.mk.outputs.id }}
+    steps:
+      - name: Create or reuse the draft release
+        id: mk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          id=$(gh api "repos/$REPO/releases?per_page=100" \
+                 --jq ".[] | select(.tag_name==\"$TAG\") | .id" | sed -n 1p)
+          if [ -z "$id" ]; then
+            id=$(gh api --method POST "repos/$REPO/releases" \
+                   -f tag_name="$TAG" -f name="playdown-remote $TAG" \
+                   -f body="Remote access companion for Playdown. Download the binary for your platform below." \
+                   -F draft=true -F prerelease=false --jq .id)
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -53,23 +81,25 @@ jobs:
           tar -C "target/${{ matrix.target }}/release" -czf "$ASSET" playdown-remote
           shasum -a 256 "$ASSET" > "$ASSET.sha256"
 
-      - name: Upload to draft release
+      - name: Upload to the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        # Upload by release id: `gh release upload <tag>` can't address a draft
+        # reliably, since a draft carries no tag until it is published.
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            --title "playdown-remote ${{ github.ref_name }}" \
-            --notes "Remote access companion for Playdown. Download the binary for your platform below." \
-            --draft 2>/dev/null || true
-          gh release upload "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            playdown-remote-*.tar.gz playdown-remote-*.sha256 --clobber
+          for f in playdown-remote-*.tar.gz playdown-remote-*.sha256; do
+            gh api --method POST \
+              "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename "$f")" \
+              -H "Content-Type: application/octet-stream" \
+              --input "$f" --jq '"uploaded " + .name'
+          done
 
   # Flip the draft to a published "latest" release only after every platform
   # has finished uploading, so `releases/latest` never serves a partial set.
   publish:
-    needs: build
+    needs: [create-release, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -77,4 +107,7 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --draft=false --latest
+        run: |
+          gh api --method PATCH \
+            "repos/${{ github.repository }}/releases/${{ needs.create-release.outputs.release_id }}" \
+            -F draft=false -F make_latest=true --jq '"published: " + .html_url'
