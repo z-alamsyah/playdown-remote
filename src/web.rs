@@ -92,6 +92,20 @@ async fn ws_upgrade(
 }
 
 async fn client(socket: WebSocket, st: AppState) {
+    // Count this device for as long as it is attached, and tell Playdown.
+    // The guard fires on every exit path below, so a phone closing its tab
+    // (or losing signal) can't leave a phantom device in Settings.
+    struct ViewerGuard(std::sync::Arc<crate::bridge::Hub>);
+    impl Drop for ViewerGuard {
+        fn drop(&mut self) {
+            self.0.viewers.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+            self.0.report_viewers();
+        }
+    }
+    st.hub.viewers.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    st.hub.report_viewers();
+    let _viewer = ViewerGuard(st.hub.clone());
+
     let (mut tx, mut rx) = {
         use futures_util_split::split_ws;
         split_ws(socket)
