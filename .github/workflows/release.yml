@@ -90,8 +90,17 @@ jobs:
         # reliably, since a draft carries no tag until it is published.
         run: |
           for f in playdown-remote-*.tar.gz playdown-remote-*.sha256; do
+            name=$(basename "$f")
+            # Replace an asset of the same name first: re-running a release
+            # (or resuming a half-finished one) would otherwise fail the whole
+            # job with 422 already_exists and skip publish.
+            old=$(gh api "repos/$REPO/releases/$RELEASE_ID/assets" \
+                    --jq ".[] | select(.name==\"$name\") | .id" | sed -n 1p)
+            if [ -n "$old" ]; then
+              gh api --method DELETE "repos/$REPO/releases/assets/$old" >/dev/null
+            fi
             gh api --method POST \
-              "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename "$f")" \
+              "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$name" \
               -H "Content-Type: application/octet-stream" \
               --input "$f" --jq '"uploaded " + .name'
           done
