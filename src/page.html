@@ -139,6 +139,7 @@
   const VERSION = "__VERSION__";
   const token = (location.hash.match(/t=([0-9a-f]+)/) || [])[1] || "";
   let ws, sessions = [], current = null, term, fit, view = "list";
+  let expired = false; // this link's token is from an earlier run
 
   const $ = (id) => document.getElementById(id);
 
@@ -427,7 +428,9 @@
     if (!sessions.length) {
       const d = document.createElement("div");
       d.className = "empty";
-      d.textContent = ws?.readyState === 1 ? "No terminal sessions in Playdown." : "Connecting…";
+      d.textContent = expired
+        ? "This link has expired - Playdown starts a new one each run. Scan the QR again in Playdown → Settings → Remote."
+        : ws?.readyState === 1 ? "No terminal sessions in Playdown." : "Connecting…";
       root.appendChild(d);
       return;
     }
@@ -522,10 +525,18 @@
   }
 
   function connect() {
+    let opened = false;
     ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?token=${token}`);
-    ws.onopen = () => { $("conn").classList.add("up"); ws.send(JSON.stringify({ op: "sessions" })); };
-    ws.onclose = () => {
+    ws.onopen = () => { opened = true; $("conn").classList.add("up"); ws.send(JSON.stringify({ op: "sessions" })); };
+    ws.onclose = async () => {
       $("conn").classList.remove("up");
+      // Refused before it ever opened: either the server is down (keep
+      // retrying) or this link is from an earlier run - the token changes on
+      // every start, so retrying would spin on "Connecting…" forever.
+      if (!opened) {
+        const r = await fetch(`/auth?token=${token}`, { cache: "no-store" }).catch(() => null);
+        if (r?.status === 401) return showExpired();
+      }
       setTimeout(connect, 2000);
     };
     ws.onmessage = (m) => {
@@ -547,6 +558,19 @@
       }
     };
   }
+
+  function showExpired() {
+    expired = true;
+    sessions = [];
+    current = null;
+    if (view === "term") goBack();
+    else renderList();
+    renderHeader();
+  }
+
+  // Scanning a new QR into a tab that already shows this page only changes
+  // the #fragment, which doesn't reload - pick up the new token.
+  addEventListener("hashchange", () => location.reload());
 
   $("back").addEventListener("click", goBack);
   initKeybar();

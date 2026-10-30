@@ -48,6 +48,7 @@ pub async fn serve(listener: tokio::net::TcpListener, token: String, hub: Arc<Hu
         .route("/assets/addon-fit.js", get(|| async { js(FIT_JS) }))
         .route("/assets/addon-webgl.js", get(|| async { js(WEBGL_JS) }))
         .route("/assets/xterm.css", get(|| async { css(XTERM_CSS) }))
+        .route("/auth", get(auth))
         .route("/ws", get(ws_upgrade))
         .with_state(state);
 
@@ -77,6 +78,18 @@ fn token_ok(given: &str, expected: &str) -> bool {
         return false;
     }
     a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+/// Lets the page tell a wrong token (a link from an earlier run - the token
+/// changes on every start) apart from an unreachable server: a refused
+/// WebSocket looks the same either way.
+async fn auth(Query(q): Query<HashMap<String, String>>, State(st): State<AppState>) -> StatusCode {
+    let given = q.get("token").map(String::as_str).unwrap_or("");
+    if token_ok(given, &st.token) {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::UNAUTHORIZED
+    }
 }
 
 async fn ws_upgrade(
