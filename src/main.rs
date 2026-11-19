@@ -38,16 +38,25 @@ fn addresses(port: u16, token: &str) -> Vec<(String, String)> {
     if let Ok(ip) = local_ip_address::local_ip() {
         urls.push((format!("http://{ip}:{port}/#t={token}"), "lan".into()));
     }
-    if let Ok(ifaces) = local_ip_address::list_afinet_netifas() {
-        for (_, ip) in ifaces {
-            // Tailscale interfaces (100.x.y.z) get their own entry.
-            if ip.is_ipv4() && ip.to_string().starts_with("100.") {
-                urls.push((format!("http://{ip}:{port}/#t={token}"), "tailscale".into()));
-            }
-        }
+    // Tailscale interfaces (100.x.y.z) get their own entry.
+    for ip in tailscale_ips() {
+        urls.push((format!("http://{ip}:{port}/#t={token}"), "tailscale".into()));
     }
     urls.dedup();
     urls
+}
+
+/// This machine's Tailscale IPv4 addresses (100.x.y.z), if any.
+pub(crate) fn tailscale_ips() -> Vec<std::net::IpAddr> {
+    local_ip_address::list_afinet_netifas()
+        .map(|ifaces| {
+            ifaces
+                .into_iter()
+                .map(|(_, ip)| ip)
+                .filter(|ip| ip.is_ipv4() && ip.to_string().starts_with("100."))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn qr_art(url: &str) -> Option<String> {

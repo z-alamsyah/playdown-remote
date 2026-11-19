@@ -210,6 +210,13 @@
     font: 12.5px ui-monospace, Menlo, monospace; word-break: break-all;
   }
   .lk small { display: block; margin-top: 5px; color: #8d96a0; font: 12px -apple-system, sans-serif; word-break: normal; }
+  /* Safari 12 has no visualViewport, so the page can't measure the keyboard.
+     iOS does scroll the focused input into view, though, and xterm's hidden
+     input follows the cursor (often near the top). Pinned to the bottom, that
+     scroll lifts the prompt and the key bar above the keyboard. */
+  .novv .xterm .xterm-helper-textarea {
+    position: fixed !important; top: auto !important; bottom: 0 !important; left: 0 !important;
+  }
   .plain {
     white-space: pre-wrap; word-break: break-all; color: #e6edf3;
     font: 12px ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text;
@@ -288,6 +295,7 @@
   const token = (location.hash.match(/t=([0-9a-f]+)/) || [])[1] || "";
   let ws, sessions = [], current = null, term, fit, view = "list";
   let expired = false; // this link's token is from an earlier run
+  let tsHost = ""; // the computer's Tailscale address, sent after the token check
 
   const $ = (id) => document.getElementById(id);
   const online = () => ws && ws.readyState === 1;
@@ -368,7 +376,7 @@
   // iOS keyboard: it overlays the page without resizing the layout viewport,
   // hiding the key bar and the terminal's bottom. Sync the body height to the
   // visual viewport and pin the scroll so everything stays above the keyboard.
-  // (Safari 12 has no visualViewport; the page then keeps its full height.)
+  // (Safari 12 has no visualViewport: see the else branch below.)
   let vvTimer;
   function syncViewport() {
     clearTimeout(vvTimer);
@@ -384,6 +392,16 @@
   if (window.visualViewport) {
     visualViewport.addEventListener("resize", syncViewport);
     visualViewport.addEventListener("scroll", syncViewport);
+  } else {
+    // See .novv in the CSS. iOS scrolls the page up while the keyboard is
+    // open; put it back once the keyboard is gone.
+    document.body.classList.add("novv");
+    document.addEventListener("focusout", () => {
+      setTimeout(() => {
+        const a = document.activeElement;
+        if (!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) window.scrollTo(0, 0);
+      }, 300);
+    });
   }
 
   function initTerm() {
@@ -392,6 +410,9 @@
       fontFamily: 'ui-monospace, Menlo, monospace',
       scrollback: 3000,
       cursorBlink: true,
+      // Agents mark links with OSC 8, so they can be tapped. xterm's default
+      // opens the raw address, and "localhost" then means the phone.
+      linkHandler: { activate: (e, uri) => showLink(uri) },
       theme: { background: "#0d1117", foreground: "#e6edf3", cursor: "#58a6ff" },
     });
     fit = new FitAddon.FitAddon();
@@ -831,22 +852,40 @@
     const seen = {};
     return found.reverse().filter((u) => !seen[u] && (seen[u] = true)).slice(0, 12);
   }
-  // "localhost" in a link means the computer, not this phone.
+  // "localhost" in a link means the computer, not this phone: point it at the
+  // address this page came from. A phone that came in over the LAN also gets
+  // the Tailscale address, where servers bound to localhost + Tailscale only
+  // (like lavish) answer.
   const LOOPBACK = /^(https?:\/\/)(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?=[:/?#]|$)/i;
+  function linkRows(url) {
+    const rows = [];
+    const add = (href, note) => {
+      const a = el("a", { className: "lk", href, target: "_blank", rel: "noopener noreferrer", textContent: href });
+      if (note) a.appendChild(el("small", { textContent: note }));
+      rows.push(a);
+    };
+    if (!LOOPBACK.test(url)) {
+      add(url);
+      return rows;
+    }
+    const at = (h) => url.replace(LOOPBACK, "$1" + (h.indexOf(":") >= 0 ? `[${h}]` : h));
+    const was = url.replace(/^https?:\/\//, "").split("/")[0];
+    const here = location.hostname;
+    add(at(here), `Was ${was} on the computer. Opens only if that server accepts outside connections.`);
+    if (tsHost && tsHost !== here && !/\.ts\.net$/i.test(here)) {
+      add(at(tsHost), "Same link over Tailscale, if the one above doesn't load. Needs Tailscale on this phone.");
+    }
+    return rows;
+  }
+  // A link tapped in the terminal.
+  function showLink(url) {
+    if (term) term.blur();
+    openSheet("Open link", linkRows(url));
+  }
   function openLinks() {
     term.blur();
     const kids = [];
-    for (const url of findLinks()) {
-      const host = location.hostname.indexOf(":") >= 0 ? `[${location.hostname}]` : location.hostname;
-      const href = url.replace(LOOPBACK, "$1" + host);
-      const a = el("a", { className: "lk", href, target: "_blank", rel: "noopener noreferrer", textContent: href });
-      if (href !== url) {
-        a.appendChild(el("small", {
-          textContent: `Was ${url.replace(/^https?:\/\//, "").split("/")[0]} on the computer. Opens only if that server accepts outside connections.`,
-        }));
-      }
-      kids.push(a);
-    }
+    for (const url of findLinks()) kids.push.apply(kids, linkRows(url));
     if (!kids.length) kids.push(el("div", { className: "note", textContent: "No links in the recent output." }));
     kids.push(el("button", { className: "wide", textContent: "Show output as text", onclick: openText }));
     openSheet("Links", kids);
@@ -1119,7 +1158,9 @@
     ws.onmessage = (m) => {
       let ev;
       try { ev = JSON.parse(m.data); } catch { return; }
-      if (ev.ev === "sessions") {
+      if (ev.ev === "hello") {
+        tsHost = ev.tailscale || "";
+      } else if (ev.ev === "sessions") {
         sessions = ev.sessions || [];
         if (current && !sessions.some((s) => s.id === current)) {
           current = null;

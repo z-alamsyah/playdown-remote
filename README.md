@@ -52,14 +52,20 @@ USAGE: playdown-remote [OPTIONS]
 - **Voice** opens a text box for the mic key on your phone keyboard. The
   browser's own speech recognition only works over https, so on this plain
   http page it is offered only when the browser allows it.
-- **Links**: the terminal is drawn on a canvas, so its text can't be tapped.
-  Links lists the URLs in recent output as real links, re-joins URLs the agent
-  wrapped across lines, and points `localhost` links at your computer. A
-  server that only listens on `localhost` still can't be reached from the
-  phone. **Show output as text** gives selectable text for anything else.
+- **Links**: the terminal is drawn on a canvas, so plain text URLs can't be
+  tapped. Links lists the URLs in recent output as real links, re-joins URLs
+  the agent wrapped across lines, and points `localhost` links at your
+  computer. Links the agent marks as links (OSC 8, as Claude Code does) can
+  also be tapped right in the terminal. A phone that connected over the LAN
+  also gets the Tailscale address of each `localhost` link, for servers that
+  listen only on `localhost` and Tailscale. A server that listens only on
+  `localhost` still can't be reached from the phone. **Show output as text**
+  gives selectable text for anything else.
 - **Browsers**: Safari 12 (iOS 12) and newer. The xterm.js files in `assets/`
   are xterm 5.5.0, addon-fit 0.10.0 and addon-webgl 0.18.0, lowered with
-  `esbuild --target=safari12 --minify` so older Safari can parse them.
+  `esbuild --target=safari12 --minify` so older Safari can parse them. Safari
+  12 can't report the keyboard's size, so there the page scrolls up while
+  the keyboard is open instead of shrinking to fit above it.
 
 ## Telegram bot (optional)
 

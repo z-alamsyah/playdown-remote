@@ -124,6 +124,15 @@ async fn client(socket: WebSocket, st: AppState) {
         split_ws(socket)
     };
 
+    // Where "localhost" links can be reached over Tailscale, for a phone that
+    // came in over the LAN. Sent only after the token check, so the page
+    // itself never shows this address to anyone.
+    let tailscale = crate::tailscale_ips().first().map(|ip| ip.to_string());
+    let hello = serde_json::json!({ "ev": "hello", "tailscale": tailscale });
+    if tx.send_text(hello.to_string()).await.is_err() {
+        return;
+    }
+
     // Replay the latest session list so the UI renders instantly.
     // (Clone out first — a MutexGuard held across .await makes the future !Send.)
     let snap = st.hub.last_sessions.lock().unwrap().clone();
