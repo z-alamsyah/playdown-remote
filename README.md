@@ -41,6 +41,24 @@ USAGE: playdown-remote [OPTIONS]
   --telegram-chat <ID>    Allowlisted chat id (or env TELEGRAM_CHAT_ID)
 ```
 
+## On the phone
+
+- **Quick actions button** (terminal view, for one-handed use): up to 4
+  template commands such as `/lavish`, typed with or without Enter; voice
+  input; show or hide the keyboard; links; and settings for the button's
+  position and size. Settings stay in that browser, per address.
+- **Voice** opens a text box for the mic key on your phone keyboard. The
+  browser's own speech recognition only works over https, so on this plain
+  http page it is offered only when the browser allows it.
+- **Links**: the terminal is drawn on a canvas, so its text can't be tapped.
+  Links lists the URLs in recent output as real links, re-joins URLs the agent
+  wrapped across lines, and points `localhost` links at your computer. A
+  server that only listens on `localhost` still can't be reached from the
+  phone. **Show output as text** gives selectable text for anything else.
+- **Browsers**: Safari 12 (iOS 12) and newer. The xterm.js files in `assets/`
+  are xterm 5.5.0, addon-fit 0.10.0 and addon-webgl 0.18.0, lowered with
+  `esbuild --target=safari12 --minify` so older Safari can parse them.
+
 ## Telegram bot (optional)
 
 Get pinged the moment an agent needs you — no relay, long polling against

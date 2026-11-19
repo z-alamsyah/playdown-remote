@@ -6,6 +6,7 @@
 <title>Playdown Remote</title>
 <link rel="stylesheet" href="/assets/xterm.css" />
 <style>
+  /* Spacing uses margins, not flex `gap`: Safari 12 (iOS 12) has no flex gap. */
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; overflow: hidden; }
   body {
@@ -16,13 +17,15 @@
     padding-bottom: env(safe-area-inset-bottom);
     /* Pinned so iOS can't pan the layout when the keyboard opens; the height
        is synced to visualViewport so nothing hides behind the keyboard. */
-    position: fixed; inset: 0; width: 100%;
+    position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%;
     overscroll-behavior: none;
   }
   header {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center;
     padding: 10px 12px; border-bottom: 1px solid #30363d; flex-shrink: 0;
   }
+  header > * { margin-right: 10px; }
+  header > :last-child { margin-right: 0; }
   .brand { font-weight: 800; font-size: 15px; letter-spacing: .02em; }
   .conn { width: 8px; height: 8px; border-radius: 50%; background: #f85149; flex-shrink: 0; }
   .conn.up { background: #3fb950; }
@@ -31,9 +34,9 @@
     display: none; background: none; border: none; color: #58a6ff;
     font-size: 24px; line-height: 1; padding: 0 8px 3px 0; cursor: pointer;
   }
-  #hdrSession { display: none; align-items: center; gap: 8px; min-width: 0; }
+  #hdrSession { display: none; align-items: center; min-width: 0; }
   #hdrSession .nm {
-    font-weight: 700; font-size: 15px;
+    font-weight: 700; font-size: 15px; margin-left: 8px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
@@ -41,24 +44,27 @@
   #viewList { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 12px; }
   .sect { margin-bottom: 20px; }
   .sect h2 {
-    display: flex; align-items: center; gap: 7px;
+    display: flex; align-items: center;
     font-size: 11px; font-weight: 700; letter-spacing: .09em;
     color: #8d96a0; margin: 0 2px 8px;
   }
-  .actions { display: flex; gap: 8px; margin-bottom: 18px; }
+  .sect h2 > span { margin-right: 7px; }
+  .actions { display: flex; margin-bottom: 18px; }
   .actions button {
     flex: 1; padding: 11px; border-radius: 10px;
     border: 1px dashed #30363d; background: #161b22; color: #8d96a0;
     font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
   }
+  .actions button + button { margin-left: 8px; }
   .actions button:active { background: #21262d; color: #e6edf3; }
   .row {
-    display: flex; align-items: center; gap: 11px; width: 100%;
+    display: flex; align-items: center; width: 100%;
     background: #161b22; border: 1px solid #30363d; border-radius: 10px;
     padding: 6px 6px 6px 12px; margin-bottom: 8px; color: #e6edf3;
     font-size: 15px; text-align: left; cursor: pointer;
     font-family: inherit;
   }
+  .row > * + * { margin-left: 11px; }
   .row:active { background: #21262d; }
   .row.blocked { border-color: rgba(248, 81, 73, .55); background: rgba(248, 81, 73, .08); }
   .row .meta { min-width: 0; padding: 7px 0; }
@@ -86,11 +92,11 @@
 
   /* ---- terminal (page 2) ---- */
   #viewTerm { flex: 1; min-height: 0; display: none; flex-direction: column; }
-  main { flex: 1; min-height: 0; padding: 6px 4px 8px 8px; }
+  main { flex: 1; min-height: 0; padding: 6px 4px 8px 8px; position: relative; }
   #term { height: 100%; }
   /* Terminal key bar — iOS keyboards have no Esc/arrows, TUIs need them */
   .keybar {
-    display: flex; gap: 6px; padding: 6px 8px; flex-shrink: 0;
+    display: flex; padding: 6px 8px; flex-shrink: 0;
     border-top: 1px solid #30363d; overflow-x: auto; -webkit-overflow-scrolling: touch;
   }
   .keybar button {
@@ -99,8 +105,106 @@
     font-family: ui-monospace, Menlo, monospace; flex-shrink: 0;
     touch-action: manipulation;
   }
+  .keybar button + button { margin-left: 6px; }
   .keybar button:active { background: #30363d; }
   .keybar button.armed { background: #1c4f9c; border-color: #58a6ff; }
+
+  /* ---- quick actions: floating button, its menu, bottom sheets ---- */
+  .hide { display: none !important; }
+  #fab {
+    position: absolute; z-index: 6; width: var(--fab); height: var(--fab); padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; border: 1px solid #30363d; background: rgba(33, 38, 45, .92);
+    color: #e6edf3; box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  #fab svg { width: 44%; height: 44%; transition: transform .15s; }
+  #fab.open svg { transform: rotate(45deg); }
+  .at-r { right: 14px; }
+  .at-l { left: 14px; }
+  #fab.at-b { bottom: 14px; }
+  #fab.at-m, #fabMenu.at-m { top: 50%; transform: translateY(-50%); }
+  #fabShade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; }
+  #fabMenu {
+    position: absolute; z-index: 6; width: 236px;
+    max-width: calc(100% - 28px); max-height: calc(100% - 28px); overflow-y: auto;
+    background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .55);
+  }
+  #fabMenu.at-b { bottom: calc(var(--fab) + 24px); }
+  #fabMenu.at-m { max-width: calc(100% - var(--fab) - 38px); }
+  #fabMenu.at-m.at-r { right: calc(var(--fab) + 24px); }
+  #fabMenu.at-m.at-l { left: calc(var(--fab) + 24px); }
+  .tpl {
+    display: block; width: 100%; text-align: left; padding: 11px 12px; margin-bottom: 6px;
+    border-radius: 9px; border: 1px solid #30363d; background: #21262d; color: #e6edf3;
+    font: 13px ui-monospace, Menlo, monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tpl .run { float: right; margin-left: 8px; color: #8d96a0; }
+  .tpl-empty { color: #6e7681; font-size: 12.5px; padding: 4px 4px 10px; line-height: 1.4; }
+  .acts { display: flex; }
+  .acts button {
+    flex: 1; padding: 8px 0 6px; border: none; border-radius: 9px; background: none;
+    color: #e6edf3; font-size: 10.5px; font-weight: 600; font-family: inherit;
+  }
+  .acts button + button { margin-left: 4px; }
+  .acts svg { display: block; width: 22px; height: 22px; margin: 0 auto 4px; }
+  .tpl:active, .acts button:active { background: #30363d; }
+
+  #sheetShade {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 9;
+    background: rgba(1, 4, 9, .55); cursor: pointer; /* iOS only sends clicks to "clickable" things */
+  }
+  #sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 10;
+    max-height: 85%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: #161b22; border-top: 1px solid #30363d; border-radius: 16px 16px 0 0;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  .sh-head { display: flex; align-items: center; margin-bottom: 12px; }
+  .sh-head b { font-size: 15px; }
+  .sh-head button {
+    margin-left: auto; padding: 4px; background: none; border: none;
+    color: #58a6ff; font-size: 15px; font-weight: 600; font-family: inherit;
+  }
+  .h { color: #8d96a0; font-size: 11px; font-weight: 700; letter-spacing: .08em; margin: 16px 2px 8px; }
+  .seg { display: flex; flex-wrap: wrap; margin-right: -6px; }
+  .seg button {
+    flex: 1 1 28%; margin: 0 6px 6px 0; padding: 10px 6px; border-radius: 9px;
+    border: 1px solid #30363d; background: #21262d; color: #e6edf3;
+    font-size: 13px; font-family: inherit;
+  }
+  .seg.two button { flex-basis: 40%; }
+  .seg button.on { background: #1c4f9c; border-color: #58a6ff; }
+  .field {
+    width: 100%; padding: 10px 11px; border-radius: 9px; border: 1px solid #30363d;
+    background: #0d1117; color: #e6edf3; font: 16px ui-monospace, Menlo, monospace;
+  }
+  textarea.field { resize: none; font-family: inherit; }
+  .trow { display: flex; align-items: center; margin-bottom: 8px; }
+  .trow .field { flex: 1; min-width: 0; }
+  .trow label { display: flex; align-items: center; margin-left: 10px; color: #8d96a0; font-size: 13px; white-space: nowrap; }
+  .trow input[type=checkbox] { width: 18px; height: 18px; margin-right: 5px; }
+  .btns { display: flex; margin-top: 10px; }
+  .btns button, .wide {
+    flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #30363d;
+    background: #21262d; color: #e6edf3; font-size: 15px; font-weight: 600; font-family: inherit;
+  }
+  .btns button + button { margin-left: 8px; }
+  .btns .primary { background: #238636; border-color: #2ea043; }
+  .wide { display: block; width: 100%; margin-top: 4px; font-size: 14px; color: #8d96a0; }
+  .note { color: #8d96a0; font-size: 12.5px; margin-top: 8px; line-height: 1.4; }
+  .lk {
+    display: block; padding: 11px 12px; margin-bottom: 8px; border-radius: 9px;
+    border: 1px solid #30363d; background: #21262d; color: #58a6ff; text-decoration: none;
+    font: 12.5px ui-monospace, Menlo, monospace; word-break: break-all;
+  }
+  .lk small { display: block; margin-top: 5px; color: #8d96a0; font: 12px -apple-system, sans-serif; word-break: normal; }
+  .plain {
+    white-space: pre-wrap; word-break: break-all; color: #e6edf3;
+    font: 12px ui-monospace, Menlo, monospace; -webkit-user-select: text; user-select: text;
+  }
 </style>
 </head>
 <body>
@@ -115,7 +219,12 @@
   <div id="viewList"><div class="empty">Connecting…</div></div>
 
   <div id="viewTerm">
-    <main><div id="term"></div></main>
+    <main>
+      <div id="term"></div>
+      <div id="fabShade" class="hide"></div>
+      <div id="fabMenu" class="hide"></div>
+      <button id="fab" class="hide" aria-label="Quick actions"></button>
+    </main>
     <div class="keybar" id="keybar">
       <button data-seq="&#27;">esc</button>
       <button data-seq="&#9;">tab</button>
@@ -131,10 +240,24 @@
     </div>
   </div>
 
+  <div id="sheetShade" class="hide"></div>
+  <div id="sheet" class="hide">
+    <div class="sh-head"><b id="sheetTitle"></b><button id="sheetClose">Done</button></div>
+    <div id="sheetBody"></div>
+  </div>
+
+<script>
+  // Safari 12 (iOS 12) lacks these and xterm.js calls them.
+  if (typeof globalThis === "undefined") window.globalThis = window;
+  if (!window.queueMicrotask) window.queueMicrotask = function (f) { Promise.resolve().then(f); };
+</script>
 <script src="/assets/xterm.js"></script>
 <script src="/assets/addon-fit.js"></script>
 <script src="/assets/addon-webgl.js"></script>
 <script>
+  // Plain ES2017 on purpose (no ?. or ??, no pointer-only events): one
+  // unsupported token and Safari 12 drops the whole script, leaving the page
+  // stuck on "Connecting…". The xterm files are lowered the same way.
   const VIEW_ONLY = __VIEW_ONLY__;
   const VERSION = "__VERSION__";
   const token = (location.hash.match(/t=([0-9a-f]+)/) || [])[1] || "";
@@ -142,6 +265,7 @@
   let expired = false; // this link's token is from an earlier run
 
   const $ = (id) => document.getElementById(id);
+  const online = () => ws && ws.readyState === 1;
 
   function b64ToBytes(b64) {
     const bin = atob(b64);
@@ -156,23 +280,54 @@
     return btoa(bin);
   }
 
+  // A tap that keeps focus on the terminal (a click would close the iOS
+  // keyboard). It acts on release and only if the finger didn't travel, so
+  // dragging to scroll the key bar or the menu doesn't fire what it started on.
+  // Safari 12 has no pointer events: touch there, mouse on desktop.
+  function press(el, fn) {
+    let x = 0, y = 0, armed = false;
+    const near = (p) => Math.abs(p.clientX - x) + Math.abs(p.clientY - y) <= 10;
+    if (window.PointerEvent) {
+      el.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        x = e.clientX; y = e.clientY; armed = true;
+      });
+      el.addEventListener("pointerup", (e) => {
+        if (armed && near(e)) fn(e);
+        armed = false;
+      });
+      el.addEventListener("pointercancel", () => { armed = false; }); // a scroll took over
+      return;
+    }
+    el.addEventListener("touchstart", (e) => {
+      x = e.touches[0].clientX;
+      y = e.touches[0].clientY;
+    }, { passive: true });
+    el.addEventListener("touchend", (e) => {
+      if (!near(e.changedTouches[0])) return;
+      e.preventDefault();
+      fn(e);
+    });
+    el.addEventListener("mousedown", (e) => { e.preventDefault(); fn(e); });
+  }
+
   let ctrlArmed = false;
 
   function sendRaw(d) {
-    if (VIEW_ONLY || !current || ws?.readyState !== 1) return;
+    if (VIEW_ONLY || !current || !online()) return;
     ws.send(JSON.stringify({ op: "input", id: current, data: strToB64(d) }));
   }
   function sendData(d) {
     sendRaw(d);
     // Typing while scrolled up in history: snap back to the live prompt.
-    term?.scrollToBottom();
+    if (term) term.scrollToBottom();
   }
 
   // Resize the PTY to this viewport (tmux-style "last client wins") so TUIs
   // reflow to phone width instead of wrapping 200-col desktop output.
   let resizeTimer;
   function sendResize() {
-    if (VIEW_ONLY || !current || ws?.readyState !== 1 || !term) return;
+    if (VIEW_ONLY || !current || !online() || !term) return;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       ws.send(JSON.stringify({ op: "resize", id: current, cols: term.cols, rows: term.rows }));
@@ -188,11 +343,12 @@
   // iOS keyboard: it overlays the page without resizing the layout viewport,
   // hiding the key bar and the terminal's bottom. Sync the body height to the
   // visual viewport and pin the scroll so everything stays above the keyboard.
+  // (Safari 12 has no visualViewport; the page then keeps its full height.)
   let vvTimer;
   function syncViewport() {
     clearTimeout(vvTimer);
     vvTimer = setTimeout(() => {
-      const vv = visualViewport;
+      const vv = window.visualViewport;
       if (vv) {
         document.body.style.height = Math.round(vv.height) + "px";
         window.scrollTo(0, 0);
@@ -200,8 +356,10 @@
       refit();
     }, 50);
   }
-  visualViewport?.addEventListener("resize", syncViewport);
-  visualViewport?.addEventListener("scroll", syncViewport);
+  if (window.visualViewport) {
+    visualViewport.addEventListener("resize", syncViewport);
+    visualViewport.addEventListener("scroll", syncViewport);
+  }
 
   function initTerm() {
     term = new Terminal({
@@ -247,10 +405,10 @@
   // the mouse — forward touch gestures as SGR mouse reports.
   // altScreen(): full-screen TUI without its own scrollback.
   const mouseOn = () => {
-    const mt = term.modes?.mouseTrackingMode;
+    const mt = term.modes && term.modes.mouseTrackingMode;
     return mt && mt !== "none" && !VIEW_ONLY;
   };
-  const altScreen = () => term.buffer?.active?.type === "alternate";
+  const altScreen = () => term.buffer.active.type === "alternate";
   function cellPos(x, y) {
     const el = $("term");
     return [
@@ -369,24 +527,300 @@
   }
 
   function initKeybar() {
-    // pointerdown + preventDefault: send the key WITHOUT stealing focus from
-    // the terminal (a click would close the iOS keyboard).
     for (const b of document.querySelectorAll(".keybar button[data-seq]")) {
-      b.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        sendData(b.dataset.seq);
-      });
+      press(b, () => sendData(b.dataset.seq));
     }
-    $("ctrlKey").addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      setCtrl(!ctrlArmed);
-    });
+    press($("ctrlKey"), () => setCtrl(!ctrlArmed));
     const setFont = (delta) => {
       term.options.fontSize = Math.max(8, Math.min(20, term.options.fontSize + delta));
       refit();
     };
-    $("fontMinus").addEventListener("pointerdown", (e) => { e.preventDefault(); setFont(-1); });
-    $("fontPlus").addEventListener("pointerdown", (e) => { e.preventDefault(); setFont(1); });
+    press($("fontMinus"), () => setFont(-1));
+    press($("fontPlus"), () => setFont(1));
+  }
+
+  // --- quick actions -------------------------------------------------------
+  // A floating button for one-handed use: templates, voice, keyboard, links.
+  // Its settings live in this browser (localStorage), so each phone - and each
+  // address it opened, LAN or Tailscale - keeps its own.
+  const PREFS = "playdown-remote.quick";
+  const SIZES = { s: 44, m: 54, l: 64 };
+  const MAX_TEMPLATES = 4;
+  const prefs = { pos: "br", size: "m", templates: [] };
+  try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS)) || {}); } catch (e) { /* private mode */ }
+  if (!Array.isArray(prefs.templates)) prefs.templates = [];
+  function savePrefs() {
+    try { localStorage.setItem(PREFS, JSON.stringify(prefs)); } catch (e) { /* private mode */ }
+  }
+
+  function el(tag, props, kids) {
+    const n = document.createElement(tag);
+    if (props) Object.assign(n, props);
+    for (const k of kids || []) n.appendChild(typeof k === "string" ? document.createTextNode(k) : k);
+    return n;
+  }
+  const ICONS = {
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+    keys: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+    link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  };
+  const icon = (name) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+
+  let menuOpen = false;
+  function placeFab() {
+    if (VIEW_ONLY) return; // no button: nothing to type
+    const where = (prefs.pos[0] === "m" ? "at-m" : "at-b") + (prefs.pos[1] === "l" ? " at-l" : " at-r");
+    $("viewTerm").style.setProperty("--fab", (SIZES[prefs.size] || SIZES.m) + "px");
+    $("fab").className = where + (menuOpen ? " open" : "");
+    $("fabMenu").className = where + (menuOpen ? "" : " hide");
+    $("fabShade").className = menuOpen ? "" : "hide";
+  }
+
+  // Type into the session as if keyed in. Enter follows a beat later as its
+  // own keypress, so the app has taken the text before the submit.
+  function typeText(text, enter) {
+    if (/[\r\n]/.test(text)) term.paste(text); // honours bracketed paste
+    else sendData(text);
+    if (enter) setTimeout(() => sendData("\r"), 120);
+  }
+
+  function openMenu() {
+    menuOpen = true;
+    const box = $("fabMenu");
+    box.innerHTML = "";
+    const tpls = prefs.templates.filter((t) => t && t.text).slice(0, MAX_TEMPLATES);
+    for (const t of tpls) {
+      const b = el("button", { className: "tpl" }, [t.text]);
+      if (t.run) b.insertBefore(el("span", { className: "run", textContent: "↵" }), b.firstChild);
+      // A press keeps the keyboard up, so arguments can follow the command.
+      press(b, () => { closeMenu(); typeText(t.text, t.run); });
+      box.appendChild(b);
+    }
+    if (!tpls.length) {
+      box.appendChild(el("div", { className: "tpl-empty", textContent: "No templates yet. Add up to 4 in Settings." }));
+    }
+    const kbUp = !!term && document.activeElement === term.textarea;
+    const acts = el("div", { className: "acts" });
+    const act = (name, label, fn) => {
+      const b = el("button", { innerHTML: icon(name) }, [label]);
+      // A click, not a press: focusing an input (the keyboard) needs one on iOS.
+      b.addEventListener("click", () => { closeMenu(); fn(); });
+      acts.appendChild(b);
+    };
+    act("mic", "Voice", openVoice);
+    act("keys", kbUp ? "Hide keys" : "Keyboard", () => (kbUp ? term.blur() : term.focus()));
+    act("link", "Links", openLinks);
+    act("sliders", "Settings", openSettings);
+    box.appendChild(acts);
+    placeFab();
+  }
+  function closeMenu() {
+    menuOpen = false;
+    placeFab();
+  }
+
+  function openSheet(title, kids) {
+    closeMenu();
+    $("sheetTitle").textContent = title;
+    const body = $("sheetBody");
+    body.innerHTML = "";
+    for (const k of kids) body.appendChild(k);
+    $("sheet").classList.remove("hide");
+    $("sheetShade").classList.remove("hide");
+    $("sheet").scrollTop = 0;
+  }
+  function closeSheet() {
+    $("sheet").classList.add("hide");
+    $("sheetShade").classList.add("hide");
+    if (rec) { try { rec.abort(); } catch (e) { /* already stopped */ } rec = null; }
+  }
+
+  // Voice: browsers allow their speech API on https only, and this page is
+  // plain http on the LAN/tailnet. So the dependable path is the mic key on
+  // the phone keyboard, into a text box; the speech API is a bonus where allowed.
+  let rec = null;
+  function openVoice() {
+    const ta = el("textarea", { className: "field", rows: 3, placeholder: "Speak or type, then Send" });
+    const note = el("div", { className: "note", textContent: "Tap the mic on your keyboard to dictate." });
+    const done = (enter) => () => {
+      const text = ta.value.trim();
+      closeSheet();
+      if (text) typeText(text, enter);
+      if (!enter) term.focus(); // keep typing after the inserted text
+    };
+    const btns = el("div", { className: "btns" });
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR && window.isSecureContext) {
+      const mic = el("button", { textContent: "Listen" });
+      mic.onclick = () => listen(SR, ta, note, mic);
+      btns.appendChild(mic);
+    }
+    btns.appendChild(el("button", { textContent: "Insert", onclick: done(false) }));
+    btns.appendChild(el("button", { className: "primary", textContent: "Send", onclick: done(true) }));
+    openSheet("Voice input", [ta, note, btns]);
+    ta.focus();
+  }
+  function listen(SR, ta, note, mic) {
+    if (rec) { rec.stop(); return; }
+    const before = ta.value ? ta.value.replace(/\s*$/, " ") : "";
+    const r = (rec = new SR());
+    r.lang = navigator.language || "en-US";
+    r.interimResults = true;
+    r.onresult = (e) => {
+      let said = "";
+      for (let i = 0; i < e.results.length; i++) said += e.results[i][0].transcript;
+      ta.value = before + said;
+    };
+    r.onerror = (e) => { note.textContent = `Voice stopped (${e.error}). Use the mic on your keyboard instead.`; };
+    // Ends arrive late: an aborted run must not clear a newer one.
+    r.onend = () => { if (rec === r) rec = null; mic.textContent = "Listen"; };
+    r.start();
+    mic.textContent = "Stop";
+  }
+
+  // Links: the terminal is drawn on a canvas, so nothing in it can be tapped
+  // or selected. List the URLs in recent output as real links instead.
+  function bufferLines(n) {
+    const buf = term.buffer.active, out = [];
+    for (let i = Math.max(0, buf.length - n); i < buf.length; i++) {
+      const row = buf.getLine(i);
+      if (!row) continue;
+      const s = row.translateToString(true);
+      // Rows the terminal soft-wrapped make one line.
+      if (row.isWrapped && out.length) out[out.length - 1] += s;
+      else out.push(s);
+    }
+    return out;
+  }
+  const URL_RE = /https?:\/\/[^\s"'<>`─-╿]+/g;
+  const WORD_RE = /^\s*([^\s"'<>`─-╿]+)(.*)$/;
+  function findLinks() {
+    const lines = bufferLines(1500), found = [];
+    // A line is "full" when it reaches the right edge of the text around it
+    // (borders and rules aside) - the only place a TUI breaks a long word -
+    // and that edge is near the terminal's width, not a column of short lines.
+    const BOX = /[─-╿]/;
+    const full = (i) => {
+      if (lines[i].length < term.cols - 10) return false;
+      let max = 0;
+      for (let k = Math.max(0, i - 6); k <= Math.min(lines.length - 1, i + 6); k++) {
+        if (!BOX.test(lines[k])) max = Math.max(max, lines[k].length);
+      }
+      return lines[i].length >= max - 1;
+    };
+    lines.forEach((line, i) => {
+      URL_RE.lastIndex = 0;
+      let m;
+      while ((m = URL_RE.exec(line))) {
+        let url = m[0], j = i, atEdge = m.index + url.length === line.length;
+        // TUIs such as Claude Code break a long URL onto the next row
+        // themselves: when it runs to the edge of a full line, the next
+        // line's first word is the rest of it.
+        while (atEdge && j + 1 < lines.length && full(j)) {
+          const w = WORD_RE.exec(lines[j + 1]);
+          if (!w) break;
+          url += w[1];
+          atEdge = !w[2];
+          j++;
+        }
+        url = url.replace(/[.,;:!?*_'"]+$/, "");
+        // Drop a closing bracket the URL didn't open: "(see https://x.io)".
+        const opens = (url.match(/[([]/g) || []).length;
+        if (/[)\]]$/.test(url) && (url.match(/[)\]]/g) || []).length > opens) url = url.slice(0, -1);
+        found.push(url);
+      }
+    });
+    const seen = {};
+    return found.reverse().filter((u) => !seen[u] && (seen[u] = true)).slice(0, 12);
+  }
+  // "localhost" in a link means the computer, not this phone.
+  const LOOPBACK = /^(https?:\/\/)(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?=[:/?#]|$)/i;
+  function openLinks() {
+    term.blur();
+    const kids = [];
+    for (const url of findLinks()) {
+      const host = location.hostname.indexOf(":") >= 0 ? `[${location.hostname}]` : location.hostname;
+      const href = url.replace(LOOPBACK, "$1" + host);
+      const a = el("a", { className: "lk", href, target: "_blank", rel: "noopener noreferrer", textContent: href });
+      if (href !== url) {
+        a.appendChild(el("small", {
+          textContent: `Was ${url.replace(/^https?:\/\//, "").split("/")[0]} on the computer. Opens only if that server accepts outside connections.`,
+        }));
+      }
+      kids.push(a);
+    }
+    if (!kids.length) kids.push(el("div", { className: "note", textContent: "No links in the recent output." }));
+    kids.push(el("button", { className: "wide", textContent: "Show output as text", onclick: openText }));
+    openSheet("Links", kids);
+  }
+  // Fallback for anything the link finder misses: plain, selectable text.
+  function openText() {
+    const text = bufferLines(400).join("\n").replace(/\s+$/, "");
+    openSheet("Output as text", [
+      el("div", { className: "note", textContent: "Press and hold to select and copy." }),
+      el("pre", { className: "plain", textContent: text }),
+    ]);
+    $("sheet").scrollTop = $("sheet").scrollHeight;
+  }
+
+  function openSettings() {
+    term.blur();
+    const seg = (key, opts, cls) => {
+      const box = el("div", { className: "seg" + (cls ? " " + cls : "") });
+      for (const [val, label] of opts) {
+        const b = el("button", { className: prefs[key] === val ? "on" : "", textContent: label });
+        b.onclick = () => {
+          prefs[key] = val;
+          savePrefs();
+          placeFab();
+          for (const x of box.children) x.className = x === b ? "on" : "";
+        };
+        box.appendChild(b);
+      }
+      return box;
+    };
+    const rows = [];
+    const examples = ["/lavish", "/mr-feedback-review", "", ""];
+    for (let i = 0; i < MAX_TEMPLATES; i++) {
+      const t = prefs.templates[i] || { text: "", run: true };
+      const inp = el("input", { className: "field", type: "text", value: t.text, placeholder: examples[i] });
+      inp.setAttribute("autocapitalize", "off");
+      inp.setAttribute("autocorrect", "off");
+      inp.spellcheck = false;
+      const chk = el("input", { type: "checkbox", checked: t.run !== false });
+      const sync = () => {
+        prefs.templates[i] = { text: inp.value.trim(), run: chk.checked };
+        savePrefs();
+      };
+      inp.oninput = sync;
+      chk.onchange = sync;
+      rows.push(el("div", { className: "trow" }, [inp, el("label", {}, [chk, "Enter"])]));
+    }
+    openSheet("Quick actions", [
+      el("div", { className: "h", textContent: "BUTTON POSITION" }),
+      seg("pos", [["br", "Bottom right"], ["bl", "Bottom left"], ["mr", "Middle right"], ["ml", "Middle left"]], "two"),
+      el("div", { className: "h", textContent: "BUTTON SIZE" }),
+      seg("size", [["s", "Small"], ["m", "Medium"], ["l", "Large"]]),
+      el("div", { className: "h", textContent: "TEMPLATES (UP TO 4)" }),
+    ].concat(rows, [
+      el("div", {
+        className: "note",
+        textContent: "Enter on: the command runs right away. Off: it is typed so you can add to it. Saved in this browser, for this address.",
+      }),
+    ]));
+  }
+
+  function initQuick() {
+    if (VIEW_ONLY) return;
+    $("fab").innerHTML = icon("plus");
+    press($("fab"), () => (menuOpen ? closeMenu() : openMenu()));
+    press($("fabShade"), closeMenu);
+    $("sheetShade").addEventListener("click", closeSheet);
+    $("sheetClose").addEventListener("click", closeSheet);
+    placeFab();
   }
 
   function name(s) { return s.custom || s.title || s.label; }
@@ -405,14 +839,14 @@
   }
 
   function sendOp(obj) {
-    if (VIEW_ONLY || ws?.readyState !== 1) return;
+    if (VIEW_ONLY || !online()) return;
     ws.send(JSON.stringify(obj));
   }
 
   function renderList() {
     const root = $("viewList");
     root.innerHTML = "";
-    if (!VIEW_ONLY && ws?.readyState === 1) {
+    if (!VIEW_ONLY && online()) {
       const acts = document.createElement("div");
       acts.className = "actions";
       const mk = (label, agent) => {
@@ -430,7 +864,7 @@
       d.className = "empty";
       d.textContent = expired
         ? "This link has expired - Playdown starts a new one each run. Scan the QR again in Playdown → Settings → Remote."
-        : ws?.readyState === 1 ? "No terminal sessions in Playdown." : "Connecting…";
+        : online() ? "No terminal sessions in Playdown." : "Connecting…";
       root.appendChild(d);
       return;
     }
@@ -493,8 +927,7 @@
     if (inTerm) {
       const s = sessions.find((x) => x.id === current);
       $("hdrName").textContent = s ? name(s) : "";
-      const d = $("hdrDot");
-      d.className = s?.status === "working" ? "spin" : "dot " + (s?.status || "");
+      $("hdrDot").className = s && s.status === "working" ? "spin" : "dot " + (s ? s.status : "");
     }
   }
 
@@ -506,7 +939,7 @@
     if (id !== current) {
       current = id;
       term.reset();
-      ws?.send(JSON.stringify({ op: "attach", id }));
+      if (online()) ws.send(JSON.stringify({ op: "attach", id }));
       // After the scrollback replay lands, the resize's SIGWINCH makes the
       // TUI redraw itself at phone width.
       sendResize();
@@ -517,7 +950,9 @@
 
   function goBack() {
     view = "list";
-    term?.blur(); // let the iOS keyboard close
+    closeMenu();
+    closeSheet();
+    if (term) term.blur(); // let the iOS keyboard close
     $("viewTerm").style.display = "none";
     $("viewList").style.display = "block";
     renderList();
@@ -535,7 +970,7 @@
       // every start, so retrying would spin on "Connecting…" forever.
       if (!opened) {
         const r = await fetch(`/auth?token=${token}`, { cache: "no-store" }).catch(() => null);
-        if (r?.status === 401) return showExpired();
+        if (r && r.status === 401) return showExpired();
       }
       setTimeout(connect, 2000);
     };
@@ -546,15 +981,13 @@
         sessions = ev.sessions || [];
         if (current && !sessions.some((s) => s.id === current)) {
           current = null;
-          term?.reset();
+          if (term) term.reset();
           if (view === "term") goBack();
         }
         if (view === "list") renderList();
         renderHeader();
-      } else if (ev.ev === "scrollback" && ev.id === current) {
-        term?.write(b64ToBytes(ev.data));
-      } else if (ev.ev === "output" && ev.id === current) {
-        term?.write(b64ToBytes(ev.data));
+      } else if ((ev.ev === "scrollback" || ev.ev === "output") && ev.id === current && term) {
+        term.write(b64ToBytes(ev.data));
       }
     };
   }
@@ -574,6 +1007,7 @@
 
   $("back").addEventListener("click", goBack);
   initKeybar();
+  initQuick();
   renderList();
   renderHeader();
   connect();
