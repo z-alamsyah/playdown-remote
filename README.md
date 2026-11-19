@@ -43,10 +43,12 @@ USAGE: playdown-remote [OPTIONS]
 
 ## On the phone
 
-- **Quick actions button** (terminal view, for one-handed use): up to 4
-  template commands such as `/lavish`, typed with or without Enter; voice
-  input; show or hide the keyboard; links; and settings for the button's
-  position and size. Settings stay in that browser, per address.
+- **Quick actions button** (terminal view, for one-handed use): tap it to
+  fan out a ring of choices around it, or hold it and slide your finger to a
+  choice and let go. Up to 4 template commands such as `/lavish`, typed with
+  or without Enter; voice input; show or hide the keyboard; links; and
+  settings for the button's position and size. Settings stay in that browser,
+  per address.
 - **Voice** opens a text box for the mic key on your phone keyboard. The
   browser's own speech recognition only works over https, so on this plain
   http page it is offered only when the browser allows it.

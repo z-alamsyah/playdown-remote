@@ -109,48 +109,57 @@
   .keybar button:active { background: #30363d; }
   .keybar button.armed { background: #1c4f9c; border-color: #58a6ff; }
 
-  /* ---- quick actions: floating button, its menu, bottom sheets ---- */
+  /* ---- quick actions: floating button, its radial menu, bottom sheets ---- */
   .hide { display: none !important; }
-  #fab {
-    position: absolute; z-index: 6; width: var(--fab); height: var(--fab); padding: 0;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 50%; border: 1px solid #30363d; background: rgba(33, 38, 45, .92);
-    color: #e6edf3; box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
-    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  #err {
+    padding: 8px 12px; flex-shrink: 0; cursor: pointer;
+    background: #3d1d1d; border-bottom: 1px solid #f85149; color: #ffb4ac; font-size: 12.5px;
   }
+  /* Playdown orange (the logo's #f83800 to #f87810), with a lit gradient rim. */
+  #fab {
+    position: absolute; z-index: 7; width: var(--fab); height: var(--fab); padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; border: 3px solid transparent; color: #fff;
+    background:
+      radial-gradient(circle at 34% 28%, #ff9a3c, #f85a00 58%, #e03c00) padding-box,
+      linear-gradient(145deg, #ffe0a8, #ff7a1a 45%, #a82600) border-box;
+    box-shadow: 0 6px 18px rgba(248, 72, 0, .45), 0 2px 6px rgba(0, 0, 0, .45);
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  #fab.open { box-shadow: 0 0 0 7px rgba(248, 90, 0, .2), 0 6px 18px rgba(248, 72, 0, .5); }
   #fab svg { width: 44%; height: 44%; transition: transform .15s; }
   #fab.open svg { transform: rotate(45deg); }
   .at-r { right: 14px; }
   .at-l { left: 14px; }
   #fab.at-b { bottom: 14px; }
-  #fab.at-m, #fabMenu.at-m { top: 50%; transform: translateY(-50%); }
-  #fabShade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; }
-  #fabMenu {
-    position: absolute; z-index: 6; width: 236px;
-    max-width: calc(100% - 28px); max-height: calc(100% - 28px); overflow-y: auto;
-    background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 8px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, .55);
+  #fab.at-m { top: 50%; margin-top: calc(var(--fab) / -2); }
+  #radial {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 6;
+    background: rgba(1, 4, 9, .55); touch-action: none;
   }
-  #fabMenu.at-b { bottom: calc(var(--fab) + 24px); }
-  #fabMenu.at-m { max-width: calc(100% - var(--fab) - 38px); }
-  #fabMenu.at-m.at-r { right: calc(var(--fab) + 24px); }
-  #fabMenu.at-m.at-l { left: calc(var(--fab) + 24px); }
-  .tpl {
-    display: block; width: 100%; text-align: left; padding: 11px 12px; margin-bottom: 6px;
-    border-radius: 9px; border: 1px solid #30363d; background: #21262d; color: #e6edf3;
-    font: 13px ui-monospace, Menlo, monospace;
+  #radialHint {
+    position: absolute; left: 50%; top: 14px; max-width: calc(100% - 28px);
+    -webkit-transform: translateX(-50%); transform: translateX(-50%);
+    padding: 7px 14px; border-radius: 999px; background: #161b22; border: 1px solid #30363d;
+    color: #e6edf3; font-size: 13px; font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .5);
   }
-  .tpl .run { float: right; margin-left: 8px; color: #8d96a0; }
-  .tpl-empty { color: #6e7681; font-size: 12.5px; padding: 4px 4px 10px; line-height: 1.4; }
-  .acts { display: flex; }
-  .acts button {
-    flex: 1; padding: 8px 0 6px; border: none; border-radius: 9px; background: none;
-    color: #e6edf3; font-size: 10.5px; font-weight: 600; font-family: inherit;
+  .ri {
+    position: absolute; width: 48px; height: 48px; margin: -24px 0 0 -24px;
+    display: flex; align-items: center; justify-content: center; border-radius: 50%;
+    background: #21262d; border: 1px solid #3d444d; color: #e6edf3;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .5);
+    transition: transform .18s ease-out, opacity .18s, border-color .1s, background .1s;
   }
-  .acts button + button { margin-left: 4px; }
-  .acts svg { display: block; width: 22px; height: 22px; margin: 0 auto 4px; }
-  .tpl:active, .acts button:active { background: #30363d; }
+  .ri svg { width: 22px; height: 22px; }
+  .ri.tp { width: 56px; height: 56px; margin: -28px 0 0 -28px; font: 600 10.5px ui-monospace, Menlo, monospace; }
+  .ri .run {
+    position: absolute; top: -3px; right: -3px; width: 18px; height: 18px; border-radius: 50%;
+    background: #f85a00; color: #fff; font-size: 11px; line-height: 18px; text-align: center;
+  }
+  .ri.on { transform: scale(1.18); background: #3a2112; border-color: #ff8a2b; }
+  @media (prefers-reduced-motion: reduce) { .ri, #fab svg { transition: none; } }
 
   #sheetShade {
     position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 9;
@@ -216,13 +225,14 @@
     <span class="count" id="count"></span>
   </header>
 
+  <div id="err" class="hide"></div>
+
   <div id="viewList"><div class="empty">Connecting…</div></div>
 
   <div id="viewTerm">
     <main>
       <div id="term"></div>
-      <div id="fabShade" class="hide"></div>
-      <div id="fabMenu" class="hide"></div>
+      <div id="radial" class="hide"><div id="radialHint"></div></div>
       <button id="fab" class="hide" aria-label="Quick actions"></button>
     </main>
     <div class="keybar" id="keybar">
@@ -247,9 +257,24 @@
   </div>
 
 <script>
-  // Safari 12 (iOS 12) lacks these and xterm.js calls them.
+  // Safari 12 (iOS 12) lacks these and xterm.js calls them. replaceChildren
+  // is the DOM renderer's (old Safari has no WebGL2, so it always gets that one).
   if (typeof globalThis === "undefined") window.globalThis = window;
   if (!window.queueMicrotask) window.queueMicrotask = function (f) { Promise.resolve().then(f); };
+  if (!Element.prototype.replaceChildren) {
+    Element.prototype.replaceChildren = function () {
+      while (this.lastChild) this.removeChild(this.lastChild);
+      this.append.apply(this, arguments);
+    };
+  }
+  // Old browsers fail in ways that can't be tested here: say what broke
+  // instead of leaving a blank screen.
+  window.addEventListener("error", function (e) {
+    if (/ResizeObserver loop/.test(e.message)) return; // harmless, Chrome only
+    var b = document.getElementById("err");
+    b.textContent = "Error: " + e.message + " (tap to hide)";
+    b.className = "";
+  });
 </script>
 <script src="/assets/xterm.js"></script>
 <script src="/assets/addon-fit.js"></script>
@@ -569,14 +594,119 @@
   const icon = (name) =>
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 
-  let menuOpen = false;
+  // The menu fans out around the button: actions on an inner ring, templates
+  // on an outer one, over the quarter (corner) or half (edge) of the circle
+  // that faces the screen. Each arc runs [from, to] in degrees, 0 = right,
+  // 90 = down.
+  const ARCS = { br: [180, 270], bl: [0, -90], mr: [270, 90], ml: [-90, 90] };
+  let radialOpen = false, ring = [], hover = -1, ringHint = "";
+
   function placeFab() {
     if (VIEW_ONLY) return; // no button: nothing to type
-    const where = (prefs.pos[0] === "m" ? "at-m" : "at-b") + (prefs.pos[1] === "l" ? " at-l" : " at-r");
+    const pos = ARCS[prefs.pos] ? prefs.pos : "br";
+    const where = (pos[0] === "m" ? "at-m" : "at-b") + (pos[1] === "l" ? " at-l" : " at-r");
     $("viewTerm").style.setProperty("--fab", (SIZES[prefs.size] || SIZES.m) + "px");
-    $("fab").className = where + (menuOpen ? " open" : "");
-    $("fabMenu").className = where + (menuOpen ? "" : " hide");
-    $("fabShade").className = menuOpen ? "" : "hide";
+    $("fab").className = where + (radialOpen ? " open" : "");
+  }
+
+  function openRadial() {
+    radialOpen = true;
+    placeFab();
+    const box = $("radial");
+    box.classList.remove("hide");
+    for (const it of ring) box.removeChild(it.el);
+    const area = box.getBoundingClientRect(), fab = $("fab").getBoundingClientRect();
+    const cx = fab.left + fab.width / 2 - area.left, cy = fab.top + fab.height / 2 - area.top;
+    const kbUp = document.activeElement === term.textarea;
+    const acts = [
+      { k: "voice", icon: "mic", label: "Voice input", run: openVoice },
+      { k: "keyboard", icon: "keys", label: kbUp ? "Hide keyboard" : "Show keyboard", run: () => (kbUp ? term.blur() : term.focus()) },
+      { k: "links", icon: "link", label: "Links", run: openLinks },
+      { k: "settings", icon: "sliders", label: "Settings", run: openSettings },
+    ];
+    const tpls = prefs.templates.filter((t) => t && t.text).slice(0, MAX_TEMPLATES).map((t, i) => ({
+      k: "t" + i, text: t.text, enter: t.run, label: t.text + (t.run ? "  ↵" : ""),
+      run: () => typeText(t.text, t.run),
+    }));
+    const r1 = fab.width / 2 + 76;
+    ring = fan(acts, r1, 48, cx, cy, area).concat(fan(tpls, r1 + 66, 56, cx, cy, area));
+    ringHint = tpls.length ? "Tap, or hold and slide" : "Tap, or hold and slide. Templates: Settings";
+    hover = -1;
+    $("radialHint").textContent = ringHint;
+    void box.offsetWidth; // commit the folded state so the fan-out animates
+    for (const it of ring) { it.el.style.transform = ""; it.el.style.opacity = ""; }
+  }
+  // Lay items along the arc at radius r, kept inside the area.
+  function fan(list, r, size, cx, cy, area) {
+    const arc = ARCS[prefs.pos] || ARCS.br, pad = size / 2 + 6;
+    return list.map((it, i) => {
+      const a = (arc[0] + (arc[1] - arc[0]) * (list.length === 1 ? 0.5 : i / (list.length - 1))) * Math.PI / 180;
+      it.x = Math.max(pad, Math.min(area.width - pad, cx + r * Math.cos(a)));
+      it.y = Math.max(pad, Math.min(area.height - pad, cy + r * Math.sin(a)));
+      it.reach = size / 2 + 10;
+      const n = el("div", { className: it.icon ? "ri" : "ri tp" });
+      n.setAttribute("data-k", it.k);
+      if (it.icon) n.innerHTML = icon(it.icon);
+      else {
+        n.textContent = it.text.length <= 7 ? it.text : it.text.slice(0, 6) + "…";
+        if (it.enter) n.appendChild(el("span", { className: "run", textContent: "↵" }));
+      }
+      n.style.left = it.x + "px";
+      n.style.top = it.y + "px";
+      // Start folded into the button.
+      n.style.transform = `translate(${cx - it.x}px, ${cy - it.y}px) scale(.3)`;
+      n.style.opacity = "0";
+      $("radial").appendChild(n);
+      it.el = n;
+      return it;
+    });
+  }
+  function closeRadial() {
+    radialOpen = false;
+    hover = -1;
+    $("radial").classList.add("hide");
+    placeFab();
+  }
+  // The ring item under a finger (client coordinates), or -1. Reach is a
+  // little past each circle's edge, no further: a template may press Enter.
+  function ringAt(p) {
+    if (!p || !radialOpen) return -1;
+    const area = $("radial").getBoundingClientRect();
+    const x = p.clientX - area.left, y = p.clientY - area.top;
+    let best = -1, bestD = Infinity;
+    ring.forEach((it, i) => {
+      const d = Math.sqrt((it.x - x) * (it.x - x) + (it.y - y) * (it.y - y));
+      if (d < it.reach && d < bestD) { best = i; bestD = d; }
+    });
+    return best;
+  }
+  function setHover(i) {
+    if (i === hover) return;
+    hover = i;
+    ring.forEach((it, k) => it.el.classList.toggle("on", k === i));
+    $("radialHint").textContent = i >= 0 ? ring[i].label : ringHint;
+  }
+  function choose(i) {
+    const it = ring[i];
+    closeRadial();
+    it.run();
+  }
+
+  // Press, slide and release on one element. Touch: the finger stays with the
+  // element it started on, and iOS counts touchend as a user action, so Voice
+  // and Keyboard may raise the keyboard from it. preventDefault keeps focus
+  // (and the keyboard) on the terminal and stops the copied mouse events, so
+  // the mouse listeners only hear a real mouse or pen.
+  function drag(target, on) {
+    const pt = (e) => (e.changedTouches ? e.changedTouches[0] : e);
+    target.addEventListener("touchstart", (e) => { e.preventDefault(); on.down(pt(e)); }, { passive: false });
+    target.addEventListener("touchmove", (e) => { e.preventDefault(); on.move(pt(e)); }, { passive: false });
+    target.addEventListener("touchend", (e) => { e.preventDefault(); on.up(pt(e)); });
+    target.addEventListener("touchcancel", () => on.up(null));
+    let active = false;
+    target.addEventListener("mousedown", (e) => { e.preventDefault(); active = true; on.down(e); });
+    addEventListener("mousemove", (e) => { if (active) on.move(e); });
+    addEventListener("mouseup", (e) => { if (active) { active = false; on.up(e); } });
   }
 
   // Type into the session as if keyed in. Enter follows a beat later as its
@@ -587,43 +717,8 @@
     if (enter) setTimeout(() => sendData("\r"), 120);
   }
 
-  function openMenu() {
-    menuOpen = true;
-    const box = $("fabMenu");
-    box.innerHTML = "";
-    const tpls = prefs.templates.filter((t) => t && t.text).slice(0, MAX_TEMPLATES);
-    for (const t of tpls) {
-      const b = el("button", { className: "tpl" }, [t.text]);
-      if (t.run) b.insertBefore(el("span", { className: "run", textContent: "↵" }), b.firstChild);
-      // A press keeps the keyboard up, so arguments can follow the command.
-      press(b, () => { closeMenu(); typeText(t.text, t.run); });
-      box.appendChild(b);
-    }
-    if (!tpls.length) {
-      box.appendChild(el("div", { className: "tpl-empty", textContent: "No templates yet. Add up to 4 in Settings." }));
-    }
-    const kbUp = !!term && document.activeElement === term.textarea;
-    const acts = el("div", { className: "acts" });
-    const act = (name, label, fn) => {
-      const b = el("button", { innerHTML: icon(name) }, [label]);
-      // A click, not a press: focusing an input (the keyboard) needs one on iOS.
-      b.addEventListener("click", () => { closeMenu(); fn(); });
-      acts.appendChild(b);
-    };
-    act("mic", "Voice", openVoice);
-    act("keys", kbUp ? "Hide keys" : "Keyboard", () => (kbUp ? term.blur() : term.focus()));
-    act("link", "Links", openLinks);
-    act("sliders", "Settings", openSettings);
-    box.appendChild(acts);
-    placeFab();
-  }
-  function closeMenu() {
-    menuOpen = false;
-    placeFab();
-  }
-
   function openSheet(title, kids) {
-    closeMenu();
+    closeRadial();
     $("sheetTitle").textContent = title;
     const body = $("sheetBody");
     body.innerHTML = "";
@@ -816,8 +911,45 @@
   function initQuick() {
     if (VIEW_ONLY) return;
     $("fab").innerHTML = icon("plus");
-    press($("fab"), () => (menuOpen ? closeMenu() : openMenu()));
-    press($("fabShade"), closeMenu);
+    // Tap: open (and tap a choice), tap again to close. Hold: slide to a
+    // choice and let go; let go anywhere else to close.
+    let gesture = null;
+    drag($("fab"), {
+      down(p) {
+        gesture = { x: p.clientX, y: p.clientY, wasOpen: radialOpen, moved: false };
+        if (!radialOpen) openRadial();
+      },
+      move(p) {
+        if (!gesture) return;
+        // Slack for a tap that drifts; reaching any choice is a longer slide.
+        if (Math.abs(p.clientX - gesture.x) + Math.abs(p.clientY - gesture.y) > 24) gesture.moved = true;
+        setHover(ringAt(p));
+      },
+      up(p) {
+        const g = gesture;
+        gesture = null;
+        if (!g) return;
+        const i = ringAt(p);
+        if (i >= 0) choose(i);
+        else if (g.wasOpen || g.moved) closeRadial();
+        else setHover(-1);
+      },
+    });
+    // Open menu: a tap on a choice picks it; a tap anywhere else closes.
+    let startedOn = -1;
+    drag($("radial"), {
+      down(p) { startedOn = ringAt(p); setHover(startedOn); },
+      move(p) { setHover(ringAt(p)); },
+      up(p) {
+        const i = ringAt(p);
+        if (i >= 0 && i === startedOn) choose(i);
+        else closeRadial();
+      },
+    });
+    // The ring is laid out for the screen it opened on.
+    const fold = () => { if (radialOpen) closeRadial(); };
+    addEventListener("resize", fold);
+    if (window.visualViewport) visualViewport.addEventListener("resize", fold);
     $("sheetShade").addEventListener("click", closeSheet);
     $("sheetClose").addEventListener("click", closeSheet);
     placeFab();
@@ -935,28 +1067,38 @@
     view = "term";
     $("viewList").style.display = "none";
     $("viewTerm").style.display = "flex";
-    if (!term) initTerm();
-    if (id !== current) {
-      current = id;
-      term.reset();
-      if (online()) ws.send(JSON.stringify({ op: "attach", id }));
-      // After the scrollback replay lands, the resize's SIGWINCH makes the
-      // TUI redraw itself at phone width.
-      sendResize();
+    const fresh = id !== current;
+    current = id;
+    renderHeader(); // before the terminal, so Back works even if it fails
+    try {
+      if (!term) initTerm();
+      if (fresh) {
+        term.reset();
+        if (online()) ws.send(JSON.stringify({ op: "attach", id }));
+        // After the scrollback replay lands, the resize's SIGWINCH makes the
+        // TUI redraw itself at phone width.
+        sendResize();
+      }
+      requestAnimationFrame(() => { refit(); term.focus(); });
+    } catch (e) {
+      $("err").textContent = `The terminal could not start in this browser: ${e.message} (tap to hide)`;
+      $("err").className = "";
+      // Don't keep a half-built terminal: the next open starts over.
+      try { term.dispose(); } catch (x) { /* it never finished */ }
+      term = null;
+      $("term").innerHTML = "";
     }
-    renderHeader();
-    requestAnimationFrame(() => { refit(); term.focus(); });
   }
 
   function goBack() {
     view = "list";
-    closeMenu();
-    closeSheet();
-    if (term) term.blur(); // let the iOS keyboard close
     $("viewTerm").style.display = "none";
     $("viewList").style.display = "block";
     renderList();
     renderHeader();
+    closeRadial();
+    closeSheet();
+    if (term) term.blur(); // let the iOS keyboard close
   }
 
   function connect() {
@@ -1006,6 +1148,7 @@
   addEventListener("hashchange", () => location.reload());
 
   $("back").addEventListener("click", goBack);
+  $("err").addEventListener("click", () => $("err").classList.add("hide"));
   initKeybar();
   initQuick();
   renderList();
